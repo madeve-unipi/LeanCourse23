@@ -2,8 +2,8 @@
 
 Please fill out the following:
 ```
-First & last name:
-Uni-ID:
+First & last name: Matteo Del Vecchio
+Uni-ID: s58mdelv
 ```
 
 ## Your own project
