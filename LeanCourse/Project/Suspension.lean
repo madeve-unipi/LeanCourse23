@@ -2,7 +2,9 @@ import LeanCourse.Common
 import Mathlib.Topology.Instances.Real
 import Mathlib.AlgebraicTopology.FundamentalGroupoid.FundamentalGroup
 import Mathlib.Analysis.InnerProductSpace.PiL2
-open BigOperators Function Set Filter Topology TopologicalSpace
+open BigOperators Function Set Filter Topology TopologicalSpace CategoryTheory
+
+noncomputable section
 
 /-
 Partial references:
@@ -14,7 +16,7 @@ Done:
 - Defined quotienting a space with respect to a subspace
 - Defined the cylinder X × I of a space
 - Defined the free suspension of a space
-- Defined the suspension of a function [IN PROGRESS]
+- Defined the suspension of a function
 - Defined the based cylinder and the pointed suspension of a pointed space
 - Defined the wedge product Y ⋁ Z of two pointed spaces Y and Z
 - Constructed an embedding Y ⋁ Z ↪ Y × Z and showed it is an embedding
@@ -26,6 +28,7 @@ Done:
 variable (X: Type*) [TopologicalSpace X]
 variable (X': Type*) [TopologicalSpace X']
 variable (f: X → X')
+
 
 --define the setoid to construct the quotient space X/A
 def quotient_setoid (A: Set X) : Setoid (X) where
@@ -87,10 +90,11 @@ def double_quotient_setoid {A B: Set X} (h: Disjoint A B) : Setoid (X) where
     }
   }
 
-lemma double_quotient_setoid_equiv_iff (A B: Set X) (h: Disjoint A B) (x y : X) : (double_quotient_setoid X h).r x y ↔ ((x ∈ A ∧ y ∈ A) ∨ (x ∈ B ∧ y ∈ B) ∨ x = y) := Iff.rfl
+lemma double_quotient_setoid_equiv_iff {A B: Set X} (h: Disjoint A B) (x y : X) : (double_quotient_setoid X h).r x y ↔ ((x ∈ A ∧ y ∈ A) ∨ (x ∈ B ∧ y ∈ B) ∨ x = y) := Iff.rfl
 
 
 --define the (non-based) cylinder of X
+--I may want to set I to be [ -1, 1] later to make everything cleaner
 notation "I" => (Icc 0 1 : Set ℝ)
 def Cylinder := X × I
 
@@ -119,23 +123,95 @@ def cyl_setoid : Setoid (Cylinder X) := by{
 
 -- define the (free) suspension of X
 def Suspension  := Quotient (cyl_setoid X)
-instance : TopologicalSpace (Suspension X) := instTopologicalSpaceQuotient
+instance : TopologicalSpace (Suspension  X) := instTopologicalSpaceQuotient
 
 notation (priority:= high) "S" => Suspension
 
 -- define the (free) suspension of a map
-def MapTimesI : Cylinder X → Cylinder X' := fun (x,t) ↦ (f x, t)
+def MapTimesI : Cylinder X → Cylinder X' := fun x ↦ (f (x.1), x.2)
 
-def MapSuspension : Suspension X → Suspension X' := by {
+
+def MapSuspension {X: Type*} {X': Type*} [TopologicalSpace X] [TopologicalSpace X'] (f:X → X') : Suspension  X → Suspension  X' := by {
+  let _hsusX := cyl_setoid X
+  let _hsusX' := cyl_setoid X'
   apply Quotient.lift ( (Quotient.mk (cyl_setoid X') )∘ (MapTimesI X X' f) )
   intro a b hab
-  simp[cyl_setoid, MapTimesI, double_quotient_setoid_equiv_iff]
-  sorry
+  have hab2 : (cyl_setoid X).r a b := by exact hab
+  have fa : MapTimesI X X' f a = (f (a.1), a.2) := by rfl
+  have fb : MapTimesI X X' f b = (f (b.1), b.2) := by rfl
+
+  simp [cyl_setoid, double_quotient_setoid_equiv_iff] at hab2
+  simp
+  have : (cyl_setoid X').r (MapTimesI X X' f a) (MapTimesI X X' f b) := by {
+    simp[cyl_setoid, double_quotient_setoid_equiv_iff]
+    simp[fa, fb]
+    obtain hc1|hc2|hc3 := hab2
+    · left
+      assumption
+    · right; left
+      assumption
+    · right; right
+      rw[hc3]
+  }
+  exact this
 }
 
---[ TODO ] show that if f is continuous, then so is its suspension
---[ TODO ] show (free) suspension is a functor
+--show that if f is continuous, then so is its suspension
+lemma mapsuspension_cont {f: X → X'} (hf: Continuous f) : Continuous (MapSuspension f) := by{
+  apply Continuous.quotient_lift
+  apply Continuous.comp
+  · exact continuous_coinduced_rng
+  · simp[MapTimesI]
+    apply Continuous.prod_map hf continuous_id
+}
 
+
+lemma mapsuspension_id : MapSuspension id = @id (Suspension X) := by{
+  let _hsusX := cyl_setoid X
+  funext x
+  simp[MapSuspension, MapTimesI]
+  have : Quotient.mk (cyl_setoid X) ∘ (fun x ↦ x) = Quotient.mk (cyl_setoid X) := by{
+    funext
+    simp
+  }
+  simp[this]
+  obtain ⟨x₁, hx₁⟩ := Quot.exists_rep x
+  rw[← hx₁]
+  apply Quotient.lift_mk
+}
+
+variable (Y': Type*) [TopologicalSpace Y']
+variable (g: X' → Y')
+
+lemma mapsuspension_comp : MapSuspension (g ∘ f) = (MapSuspension g) ∘ (MapSuspension f) := by{
+  funext x
+  simp
+  obtain ⟨x₁, hx₁⟩ := Quot.exists_rep x
+  rw[←hx₁]
+  simp[MapSuspension, MapTimesI]
+  rfl
+}
+
+-- Show (free) suspension is a functor
+
+def SuspensionFunctor : CategoryTheory.Functor TopCat TopCat where
+  obj:= fun X ↦ TopCat.of (S X)
+  map:= fun
+    | .mk f continuous_f => .mk (MapSuspension f) (mapsuspension_cont _ _ continuous_f)
+  map_id := by{
+    simp
+    intro X
+    simp [mapsuspension_id]
+    rfl
+  }
+  map_comp := by{
+    simp
+    intros
+    simp[mapsuspension_comp]
+    rfl
+  }
+
+--[ TODO ] Define iterated suspensions
 --[ TODO ] joins in general???
 
 --define the pointed cylinder of Y
@@ -145,6 +221,7 @@ def pointedcylinder_setoid : Setoid (Cylinder Y) := by{
   exact quotient_setoid (Cylinder Y) ({x : Cylinder Y | x.1 = default})
 }
 
+/--Pointed cylinder of a pointed topological space-/
 def PointedCylinder := Quotient (pointedcylinder_setoid Y)
 
 --show PointedCylinder is a pointed topological space with basepoint * × I
@@ -170,7 +247,8 @@ instance : Inhabited (BasedSuspension Y) where
 
 notation (priority:= high) "Σ₀" => BasedSuspension
 
---[ TODO ] Define the pointed suspension functor and show it is a functor
+--[ TODO ] Define the based suspension functor and show it is a functor
+--[ TODO ] Define iterated suspensions
 
 -- define the wedge product Y ⋁ Z of two pointed spaces Y and Z
 
@@ -193,7 +271,7 @@ infix:50 " ⋁ " => Wedge
 
 -- easy lemma for later
 lemma wedge_defaults_equiv: Quotient.mk (wedge_setoid Y Z) (Sum.inl default) = Quotient.mk (wedge_setoid Y Z) (Sum.inr default) := by{
-  let hwedge := wedge_setoid Y Z
+  let _hwedge := wedge_setoid Y Z
   refine Quotient.eq.mpr ?_
   have : (wedge_setoid Y Z).r (Sum.inl default) (Sum.inr default) := by{
     simp[quotient_setoid_equiv_iff]
@@ -202,7 +280,8 @@ lemma wedge_defaults_equiv: Quotient.mk (wedge_setoid Y Z) (Sum.inl default) = Q
 }
 
 --[ TODO ] define arbitrarily large wedge products
---[ TODO ] show that there is a natural isomorphism X ⋁ Y ≃ Y ⋁ X
+--[ TODO ] show that there is a natural homeomorphism X ⋁ Y ≃ Y ⋁ X
+--[ TODO ] show that X ≃ X'→ X ⋁ Y ≃ X' ⋁ Y
 
 
 -- show that there is an embedding of the wedge product inside the topological product X × Y
@@ -272,8 +351,7 @@ lemma wedge_embedding_cont: Continuous (wedge_embedding Y Z) := by{
 
 
 lemma wedge_embedding_inducing: Inducing (wedge_embedding Y Z) := by{
-  --this is listed as an unused variable, but it fails to synthesize instances if I remove it
-  let hwedge := wedge_setoid Y Z
+  let _ := wedge_setoid Y Z
   rw[inducing_iff]
   refine TopologicalSpace.ext_iff.mpr ?left.a
   intro A
@@ -378,7 +456,7 @@ lemma wedge_embedding_inducing: Inducing (wedge_embedding Y Z) := by{
 
 
 theorem wedge_embeds_into_product: Embedding (wedge_embedding Y Z) := by{
-  let hwedge := wedge_setoid Y Z
+  let _hwedge := wedge_setoid Y Z
   rw[embedding_iff]
   constructor
   --induced topology
@@ -441,152 +519,68 @@ instance: Inhabited (Smash Y Z) where
 
 infix:50 " ⋀  " => Smash
 
+--[ TODO ] show that there is a natural isomorphism X ⋀ Y ≃ Y ⋀ X
+--[ TODO ] show that X ≃ X'→ X ⋀ Y ≃ X' ⋀ Y
 --[ TODO ] show X ⋀ S¹ ≃ Σ₀ X (Hatcher page 12)
 
 --define the spheres Sⁿ
 
 variable (n:ℕ)
 notation "𝕊" n => Metric.sphere (0:EuclideanSpace ℝ (Fin n)) 1
-
-instance: TopologicalSpace (EuclideanSpace ℝ (Fin n)) := by exact UniformSpace.toTopologicalSpace
-
---???
+noncomputable instance: TopologicalSpace (EuclideanSpace ℝ (Fin n)) := by exact UniformSpace.toTopologicalSpace
 instance: TopologicalSpace (𝕊 n) := instTopologicalSpaceSubtype
 
 --prove that the free suspension of 𝕊ⁿ is homeomorphic to 𝕊^{n+1}
 
-def test_function : Fin 4 → ℝ := fun i ↦ i
-#eval test_function 3
---lol
-
-
-def suspension_to_sphere: (𝕊 n) × (Icc (-1) 1) → (𝕊 (n+1)) := fun (⟨x, p⟩, t) ↦ ⟨(fun i ↦ Real.sqrt (1-t*t) * (x i) ), by{simp; ring}⟩
-
-
-
-theorem sphere_suspension: S (𝕊 n) ≃ₜ (𝕊 (n+1)) := by{
+lemma target_in_sphere (y : 𝕊 n) (t: I) : @norm (EuclideanSpace ℝ (Fin (n + 1))) SeminormedAddGroup.toNorm (Fin.snoc (fun i ↦ Real.sqrt (1 - (↑t+1)/2) * (↑t+1)/2 * y.1 i) ((↑t +1)/2))  = 1 := by{
+  simp[Fin.snoc, EuclideanSpace.norm_eq]
   sorry
 }
 
 
+def cyl_to_sphere: (𝕊 n) × I  → (𝕊 (n+1)) :=
+  fun (⟨x, p⟩, t) ↦ ⟨Fin.snoc ( fun i ↦ Real.sqrt (1-((↑t +1)/2)*((↑t +1)/2)) * (x i) ) (↑t +1)/2 ,  by{simp; exact target_in_sphere n (⟨x, p⟩) t} ⟩
 
---define the 1-sphere, with basepoint the point (1,0)
-def sphere := {x : ℝ × ℝ | x.1^2 + x.2^2 = 1 }
 
-example: (1,0) ∈ sphere := by{
-  simp[sphere]
+def sus_to_sphere: S (𝕊 n) → 𝕊 (n+1) := by{
+  apply Quotient.lift (cyl_to_sphere n)
+  intro a b hab
+  sorry
 }
 
-instance: TopologicalSpace (sphere) := instTopologicalSpaceSubtype
-instance: Inhabited (sphere) where
-  default:= ⟨(1,0), by simp[sphere]⟩
 
-def complex_sphere := {z : ℂ | Complex.normSq z =1 }
-
-example: 1 ∈ complex_sphere := by{
-  simp[complex_sphere]
+theorem injective_sus_to_sphere : Injective (sus_to_sphere n) := by{
+  sorry
 }
 
-instance: TopologicalSpace (complex_sphere):= instTopologicalSpaceSubtype
-instance: Inhabited (complex_sphere) where
-  default:= ⟨1, by simp[complex_sphere]⟩
-
-def sphere_compare : sphere → complex_sphere := fun ⟨(x,y), p⟩ ↦ ⟨x + y * Complex.I, by {simp[complex_sphere]; rw[Complex.normSq_add_mul_I]; simp[sphere] at p; assumption
-}⟩
-
-def sphere_compare_inv : complex_sphere → sphere := fun ⟨z, p⟩ ↦ ⟨(z.re, z.im), by {simp[sphere]; simp[complex_sphere, Complex.normSq_apply] at p; rw[←p]; ring}⟩
-
---Lean's distance on ℝ² is the supremum distance, not the Euclidean one.
---This is no big deal since they are topologically equivalent
-lemma plane_distance (x y : ℝ × ℝ): dist x y = max (|x.1-y.1|) (|x.2-y.2|) := rfl
-
-lemma some_inequality {x y z: ℝ} (h1: x^2 + y^2 < z^2) (h2: z > 0) : |x|< z ∧ |y|<z := by {
-  by_contra hcontr
-  push_neg at hcontr
-  by_cases h: |x|<z
-  · specialize hcontr h
-    have : z^2 ≤ y^2 := by {
-      refine (Real.le_sqrt' h2).mp ?_
-      rw [Real.sqrt_sq_eq_abs]
-      assumption
-    }
-    have that : z^2 < z^2 := by {
-      calc
-      z^2 ≤ y^2 := this
-      _ ≤ x^2 + y^2 := by{
-        refine tsub_le_iff_right.mp ?_
-        ring
-        exact sq_nonneg x
-      }
-      _ < z^2 := h1
-    }
-    exact LT.lt.false that
-  · simp at h
-    have : z^2 ≤ x^2 := by {
-      refine (Real.le_sqrt' h2).mp ?_
-      rw [Real.sqrt_sq_eq_abs]
-      assumption
-    }
-    have that: z^2 < z^2 := by {
-      calc
-      z^2 ≤ x^2 := this
-      _ ≤ x^2 + y^2 := by {
-        refine tsub_le_iff_left.mp ?_
-        ring
-        exact sq_nonneg y
-      }
-      _ < z^2 := h1
-    }
-    exact LT.lt.false that
+theorem surjective_sus_to_sphere : Surjective (sus_to_sphere n) := by{
+  sorry
 }
 
-lemma sphere_compare_cont : Continuous sphere_compare := by{
-  refine Metric.continuous_iff.mpr ?_
-  intro z₀ ε hε
-  use (Real.sqrt 2)*ε
-  constructor
-  · simp; assumption
-  · intro z hz
-    simp [dist, Complex.dist_eq_re_im, sphere_compare]
-    rw[plane_distance] at hz
-
+def sus_to_sphere_equiv : S (𝕊 n) ≃ (𝕊 (n+1)) := by{
+  sorry
 }
 
-lemma sphere_compare_inv_cont: Continuous sphere_compare_inv := by {
-  refine Metric.continuous_iff.mpr ?_
-  intro z₀ ε hε
-  --the minimal choice is something like ε/sqrt2
-  use ε
-  constructor
-  · assumption
-  · intro z hz
-    simp[sphere_compare_inv, dist]
-    simp [dist, Complex.dist_eq_re_im] at hz
-    rw[plane_distance]
-    simp
-    have hz': ((z:ℂ).re - (z₀:ℂ).re)^2 + ((z:ℂ).im - (z₀:ℂ).im)^2 < ε^2 := (Real.sqrt_lt' hε).mp hz
-    exact some_inequality hz' hε
+theorem continuous_sus_to_sphere : Continuous (sus_to_sphere_equiv n) := by{
+  sorry
 }
 
-instance: Homeomorph sphere complex_sphere where
-  toFun := sphere_compare
-  invFun := sphere_compare_inv
-  left_inv := by{
-    intro x
-    simp[sphere_compare, sphere_compare_inv]
-  }
-  right_inv := by{
-    intro x
-    simp[sphere_compare, sphere_compare_inv]
-  }
-  continuous_toFun := sphere_compare_cont
-  continuous_invFun := sphere_compare_inv_cont
+
+instance : CompactSpace (Cylinder (𝕊 n)) := instCompactSpaceProdInstTopologicalSpaceProd
+instance : CompactSpace (S (𝕊 n)) := Quotient.compactSpace
+
+
+def sus_to_sphere_homeo: S (𝕊 n)  ≃ₜ (𝕊 (n+1))  := by{
+  apply Continuous.homeoOfEquivCompactToT2 (continuous_sus_to_sphere n)
+}
 
 -- add inhabited part; this is a pointed homeomorphism
+
 
 /- Ideal, partial todo list:
 -- suspension as smashing with S^1
 -- suspension of S^n is S^{n+1}
+-- free and reduced suspension are homotopy equivalent (is this even true for all spaces though?)
 -- adjunction with loop (depending on difficulty, either the smash version or just the suspension version)
 -- time permitting, more related and basic topological things that are missing
 
@@ -594,3 +588,5 @@ Some things about the mapping cone seem to be in Mathlib in abstract nonsense fo
 -/
 
 --#lint
+
+end
