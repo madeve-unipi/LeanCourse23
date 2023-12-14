@@ -92,6 +92,24 @@ def double_quotient_setoid {A B: Set X} (h: Disjoint A B) : Setoid (X) where
 
 lemma double_quotient_setoid_equiv_iff {A B: Set X} (h: Disjoint A B) (x y : X) : (double_quotient_setoid X h).r x y ↔ ((x ∈ A ∧ y ∈ A) ∨ (x ∈ B ∧ y ∈ B) ∨ x = y) := Iff.rfl
 
+-- we will need to define functions X/∼  → Y/∼
+def quotient_double_lift {A B : Type*} (S: Setoid A) (T: Setoid B) (f: A → B) (h: ∀ a₁ a₂ : A, S.r a₁ a₂ → T.r (f a₁) (f a₂)) : Quotient S → Quotient T := by {
+  apply Quotient.lift (Quotient.mk T ∘ f)
+  intro a₁ a₂ h12
+  have : S.r a₁ a₂ := h12
+  specialize h a₁ a₂ h12
+  rw[Function.comp, Function.comp]
+  exact Quotient.eq.mpr h
+}
+
+lemma quotient_double_lift_commutes {A B : Type*} {S: Setoid A} {T: Setoid B} (f: A → B) {h: ∀ a₁ a₂ : A, S.r a₁ a₂ → T.r (f a₁) (f a₂)} : (Quotient.mk T) ∘ f = quotient_double_lift S T f h ∘ (Quotient.mk S) := by{
+  funext x
+  simp[quotient_double_lift]
+}
+--ARE TOO MANY ARGUMENTS IMPLICIT?
+--So far, I haven't used this. I should rephrase quotient-to-quotient maps in terms of this if it's worth it
+
+
 
 --define the (non-based) cylinder of X
 --I may want to set I to be [ -1, 1] later to make everything cleaner
@@ -280,11 +298,139 @@ lemma wedge_defaults_equiv: Quotient.mk (wedge_setoid Y Z) (Sum.inl default) = Q
 }
 
 --[ TODO ] define arbitrarily large wedge products
---[ TODO ] show that there is a natural homeomorphism X ⋁ Y ≃ Y ⋁ X
+
+
+-- Show that there is a homeomorphism X ⋁ Y ≃ Y ⋁ X
+
+lemma continuous_sum_swap: Continuous (@Sum.swap Y Z) := by{ --this looks like it should be a lemma from the library but I couldn't find it
+  refine continuous_sum_dom.mpr ?_
+  constructor
+  · have : (@Sum.swap Y Z) ∘ (@Sum.inl Y Z) = @Sum.inr Z Y := rfl
+    rw[this]
+    exact continuous_inr
+  · have : (@Sum.swap Y Z) ∘ (@Sum.inr Y Z) = @Sum.inl Z Y := rfl
+    rw[this]
+    exact continuous_inl
+}
+
+
+def sum_commutes: Y ⊕ Z ≃ₜ Z ⊕ Y where
+  toFun:= @Sum.swap Y Z
+  continuous_toFun := continuous_sum_swap Y Z
+  invFun:= @Sum.swap Z Y
+  continuous_invFun := continuous_sum_swap Z Y
+  left_inv:= by simp
+  right_inv:= by simp
+
+
+def wedge_swap: Y ⋁ Z → Z ⋁ Y := by{
+  let _hwedge := wedge_setoid Y Z
+  let _hwedge' := wedge_setoid Z Y
+  apply Quotient.lift ( (Quotient.mk (wedge_setoid Z Y)  ) ∘ (@Sum.swap Y Z))
+  intro a b hab
+  have hab2: Setoid.r a b := by exact hab
+  simp [quotient_setoid_equiv_iff] at hab2
+  obtain hc1|hc2 := hab2
+  · induction a
+    case inl ya => {
+      induction b
+      case inl yb => {
+        simp at hc1
+        simp[hc1]
+      }
+      case inr zb => {
+        simp at hc1
+        simp[hc1]
+        have : Setoid.r (@Sum.inr Z Y default) (Sum.inl default) := by{
+          simp[quotient_setoid_equiv_iff]
+        }
+        exact this
+      }
+    }
+    case inr za => {
+      induction b
+      case inl yb => {
+        simp at hc1
+        simp [hc1]
+        have : Setoid.r (@Sum.inl Z Y default) (Sum.inr default) := by simp[quotient_setoid_equiv_iff]
+        exact this
+      }
+      case inr zb => {
+        simp at hc1
+        simp[hc1]
+      }
+    }
+  · rw[hc2]
+}
+
+lemma continuous_wedge_swap : Continuous (wedge_swap Y Z) := by{
+  apply Continuous.quotient_lift
+  apply Continuous.comp
+  · exact continuous_coinduced_rng
+  · exact continuous_sum_swap Y Z
+}
+
+
+lemma wedge_swap_inl (y:Y) : (wedge_swap Y Z) (Quotient.mk _ (Sum.inl y) ) = Quotient.mk _ (@Sum.inr Z Y y) := by{
+  simp[wedge_swap]
+  apply Quot.lift_mk
+  exact fun a₁ a₂ a ↦ a
+}
+
+lemma wedge_swap_inr (z:Z) : (wedge_swap Y Z) (Quotient.mk _ (Sum.inr z) ) = Quotient.mk _ (@Sum.inl Z Y z) := by{
+  simp[wedge_swap]
+  apply Quot.lift_mk
+  exact fun a₁ a₂ a ↦ a
+}
+
+
+def wedge_commutes: Y ⋁ Z ≃ₜ Z ⋁ Y where
+  toFun:= wedge_swap Y Z
+  continuous_toFun := continuous_wedge_swap Y Z
+  invFun:= wedge_swap Z Y
+  continuous_invFun := continuous_wedge_swap Z Y
+  left_inv:= by {
+    let _hwedge := wedge_setoid Y Z
+    let _hwedge' := wedge_setoid Z Y
+    simp[LeftInverse]
+    intro x
+    obtain ⟨x', hx'⟩ := Quotient.exists_rep x
+    rw[← hx']
+    induction x'
+    case inl y => {
+      rw[wedge_swap_inl Y Z y]
+      rw[wedge_swap_inr]
+    }
+    case inr z => {
+      rw[wedge_swap_inr, wedge_swap_inl]
+    }
+  }
+  right_inv:= by {
+    simp[Function.RightInverse, LeftInverse]
+    intro x
+    obtain ⟨x', hx'⟩ := Quotient.exists_rep x
+    rw[← hx']
+    induction x'
+    case inl y => {
+      rw[wedge_swap_inl, wedge_swap_inr]
+    }
+    case inr z => {
+      rw[wedge_swap_inr, wedge_swap_inl]
+    }
+  }
+
+
+--[ TODO ] The wedge product is the coproduct in pointed topological spaces
+
+
+
+
+
 --[ TODO ] show that X ≃ X'→ X ⋁ Y ≃ X' ⋁ Y
 
 
 -- show that there is an embedding of the wedge product inside the topological product X × Y
+-- THIS CAN PROBABLY BE REWRITTEN USING THE COPRODUCT PROPERTY ABOVE
 def coprod_prod_map : Y ⊕ Z → Y × Z := fun
   | .inl y => (y, (default:Z))
   | .inr z => ((default:Y), z)
@@ -519,7 +665,11 @@ instance: Inhabited (Smash Y Z) where
 
 infix:50 " ⋀  " => Smash
 
---[ TODO ] show that there is a natural isomorphism X ⋀ Y ≃ Y ⋀ X
+--[ TODO ] show that there is a natural isomorphism Y ⋀ Z ≃ Z ⋀ Y
+
+
+
+
 --[ TODO ] show that X ≃ X'→ X ⋀ Y ≃ X' ⋀ Y
 --[ TODO ] show X ⋀ S¹ ≃ Σ₀ X (Hatcher page 12)
 
@@ -532,14 +682,14 @@ instance: TopologicalSpace (𝕊 n) := instTopologicalSpaceSubtype
 
 --prove that the free suspension of 𝕊ⁿ is homeomorphic to 𝕊^{n+1}
 
-lemma target_in_sphere (y : 𝕊 n) (t: I) : @norm (EuclideanSpace ℝ (Fin (n + 1))) SeminormedAddGroup.toNorm (Fin.snoc (fun i ↦ Real.sqrt (1 - (↑t+1)/2) * (↑t+1)/2 * y.1 i) ((↑t +1)/2))  = 1 := by{
+lemma target_in_sphere (y : 𝕊 n) (t: I) : @norm (EuclideanSpace ℝ (Fin (n + 1))) SeminormedAddGroup.toNorm (Fin.snoc (fun i ↦ Real.sqrt (1 - (↑t+1)/2 * (↑t+1)/2) * (y.1 i) ) ((↑t +1)/2))  = 1 := by{
   simp[Fin.snoc, EuclideanSpace.norm_eq]
   sorry
 }
 
 
 def cyl_to_sphere: (𝕊 n) × I  → (𝕊 (n+1)) :=
-  fun (⟨x, p⟩, t) ↦ ⟨Fin.snoc ( fun i ↦ Real.sqrt (1-((↑t +1)/2)*((↑t +1)/2)) * (x i) ) (↑t +1)/2 ,  by{simp; exact target_in_sphere n (⟨x, p⟩) t} ⟩
+  fun (⟨x, p⟩, t) ↦ ⟨Fin.snoc ( fun i ↦ Real.sqrt (1-((↑t +1)/2)*((↑t +1)/2)) * (x i) ) ((↑t +1)/2) ,  by{simp; exact target_in_sphere n (⟨x, p⟩) t} ⟩
 
 
 def sus_to_sphere: S (𝕊 n) → 𝕊 (n+1) := by{
@@ -575,6 +725,7 @@ def sus_to_sphere_homeo: S (𝕊 n)  ≃ₜ (𝕊 (n+1))  := by{
 }
 
 -- add inhabited part; this is a pointed homeomorphism
+
 
 
 /- Ideal, partial todo list:
