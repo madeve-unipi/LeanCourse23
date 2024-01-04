@@ -1190,9 +1190,7 @@ def homeo_wedge_compare : Y ⋀ Z ≃ₜ⋆ W ⋀ Z where
     simp [smash_maps_comp, PointedHomeo.symm, smash_maps]
     obtain ⟨x', hx'⟩:= Quotient.exists_rep x
     rw[← hx']
-    simp[Quotient.lift_mk, prod_maps, pointed_symm_toFun]
-    --those two should compose to the identity; then automatic
-    sorry
+    simp[Quotient.lift_mk, prod_maps]
   }
   right_inv := by{
     let _:=smashsetoid Y Z
@@ -1204,8 +1202,6 @@ def homeo_wedge_compare : Y ⋀ Z ≃ₜ⋆ W ⋀ Z where
     obtain ⟨x', hx'⟩:= Quotient.exists_rep x
     rw[← hx']
     simp[Quotient.lift_mk, prod_maps]
-    --similar to left_inv
-    sorry
   }
 
   pointed_toFun := pointed_wedge_compare Z k
