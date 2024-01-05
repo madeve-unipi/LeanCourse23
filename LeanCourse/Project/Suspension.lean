@@ -40,7 +40,7 @@ variable {X': Type*} [TopologicalSpace X']
 variable (f: X → X')
 
 
---define the setoid to construct the quotient space X/A
+/--The setoid on X associated to the quotient topological space X/A-/
 def quotient_setoid (A: Set X) : Setoid (X) where
   r:= fun x ↦ fun y ↦ (x ∈ A ∧ y ∈ A) ∨ x=y
   iseqv := {
@@ -546,7 +546,7 @@ def homeo_wedge_swap {W: Type*} [TopologicalSpace W] [Inhabited W] (f: Y ≃ₜ�
 
   invFun:= by{
     apply @wedge_induced W _ Z _ (Y ⋁ Z) _ _ ((wedge_inl Y Z) ∘ f.invFun) (wedge_inr Y Z) ?_ ?_
-    · rw[Function.comp, pointed_invFun f]
+    · rw[Function.comp, f.pointed_invFun]
       rfl
     · simp[wedge_inr]
       rw[← wedge_defaults_equiv]
@@ -842,7 +842,7 @@ theorem wedge_embeds_into_product: Embedding (wedge_embedding Y Z) := by{
     }
 }
 
--- if something is in the image of the wedge embedding, then at least one of its coordinates is default
+--if something is in the image of the wedge embedding, then at least one of its coordinates is default
 lemma wedge_embedding_ran {x: Y × Z} (h: x ∈ range (wedge_embedding Y Z)) : x.1=default ∨ x.2=default := by{
   let _:= wedge_setoid Y Z
   simp at h
@@ -941,8 +941,21 @@ lemma smash_elt_eq_iff (y y' :Y) (z z':Z) : (smash_elt y z = smash_elt y' z') �
     exact Quotient.eq.mpr this
 }
 
+@[simp] theorem smash_defaults_left (y:Y) : (y ∧' (default:Z)) = default := by{
+  have : (default: Y ⋀ Z) = (default ∧' default) := rfl
+  rw[this]
+  simp[smash_elt_eq_iff]
+}
 
---show that there is a natural pointed isomorphism Y ⋀ Z ≃ₜ Z ⋀ Y
+@[simp] theorem smash_defaults_right (z:Z) : ((default:Y) ∧' z) = default := by{
+  have : (default: Y ⋀ Z) = (default ∧' default) := rfl
+  rw[this]
+  rw[smash_elt_eq_iff]
+  left
+  simp
+}
+
+--show that there is a pointed isomorphism Y ⋀ Z ≃ₜ Z ⋀ Y
 
 def prod_swap : Y × Z → Z × Y := fun (y,z) ↦ (z,y)
 
@@ -1061,7 +1074,7 @@ def homeo_smash_swap: Y ⋀ Z ≃ₜ⋆ Z ⋀ Y where
 
 
 
---[ TODO ] show that Y ≃ₜ⋆  W → Y ⋀ Z ≃ₜ⋆  W ⋀ Z
+--Show that Y ≃ₜ⋆  W → Y ⋀ Z ≃ₜ⋆  W ⋀ Z
 variable (W:Type*) [TopologicalSpace W] [Inhabited W]
 variable (W':Type*) [TopologicalSpace W'] [Inhabited W']
 
@@ -1219,7 +1232,7 @@ instance: TopologicalSpace (𝕊 n) := instTopologicalSpaceSubtype
 #check EuclideanSpace.single (1 : Fin 4) (2: ℝ)
 
 instance: Inhabited (𝕊 n) where
-  default := ⟨EuclideanSpace.single (0: Fin 3) (1:ℝ) , by simp⟩ --3???
+  default := ⟨EuclideanSpace.single (0: Fin 3) (1:ℝ) , by simp⟩ --3??? This should be n+1 I think, but it fails
 
 
 
@@ -1467,6 +1480,8 @@ lemma continuous_sus_to_wedge : Continuous (sus_to_wedge Y) := by{
   exact continuous_prod_to_wedge Y
 }
 
+-- Pointed etc
+
 
 --Finally, compose to get
 --[ TODO ] show Y ⋀ S¹ ≃ₜ⋆  Σ₀ Y (Hatcher page 12)
@@ -1474,14 +1489,135 @@ lemma continuous_sus_to_wedge : Continuous (sus_to_wedge Y) := by{
 
 
 
---[ TODO ] adjunction Top_* (X ⋀ Y, Z) ≃ Top_* (X, Top_* (Y,Z)) for Y locally compact
+--[ TODO ] adjunction Top_* (Y ⋀ Z, W) ≃ Top_* (Y, Top_* (Z,W)) for Z locally compact
 section adjunction
+/-
+Ideally, this should be a categorical statement: the functor Hom(Z,-) is right adjoint to -⋀ Z
+in pointed topological spaces. I haven't framed pointed spaces as a category, see eg
+    mathlib4/Mathlib/CategoryTheory/Category/Pointed.lean
+for general pointed types.
+I think the bulk of the proof is what I'm doing now and it can all be polished up at a later stage
+-/
+
+/-The unpointed version of the map we want is already in Mathlib as ContinuousMap.curry
+  This is why ours will be called PointedMap.curry -/
+
+variable [LocallyCompactSpace Z]
+instance : TopologicalSpace C⋆(Z,W) := PointedMap.compactOpen Z W
+instance : Inhabited C⋆(Z,W) where
+  default := PointedMap.trivial Z W
+
+
+namespace PointedMap
+variable {Y Z W}
+/- Much of the following (up to end PointedMap) is adapted from mathlib4/Mathlib/Topology/CompactOpen.lean by Reid Barton, starting on line 364 -/
+
+/-- Auxiliary definition, see `PointedMap.curry`. -/
+def curry' (f : C⋆(Y ⋀ Z, W)) (y : Y) : C⋆(Z, W) where
+  toFun := Function.curry (f ∘ Quotient.mk (smashsetoid Y Z)) y
+  continuous_toFun := by {
+    apply Continuous.comp
+    · apply Continuous.comp
+      · exact map_continuous f
+      · exact continuous_quot_mk
+    · exact Continuous.Prod.mk y
+  }
+  pointed_toFun := by{
+    simp
+    have : Quotient.mk (smashsetoid Y Z) (y, default) = ( y ∧' default) := rfl
+    simp[this]
+  }
+
+  /-- If a map `X ⋀ Y → Z` is continuous, then its curried form `X → C⋆(Y, Z)` is continuous. -/
+theorem continuous_curry' (f : C⋆(Y ⋀ Z, W)) : Continuous (curry' f) := by{
+  --apply Continuous.comp
+  sorry
+}
+
+
+
+--Continuous.comp (continuous_comp f) continuous_coev
+
+theorem pointed_curry' (f : C⋆(Y ⋀ Z, W)) : (curry' f) default = default := by{
+  simp[curry']
+  ext z
+  -- Don't I have a simp lemma that simplifies this further??? Shouldn't this be just simp now?
+  sorry
+}
+
+-- [TO FIX] Variables are a mess now. Documentation strings have the correct one, and code lines have one shifted. Exercise caution.
+
+/-- The curried form of a pointed continuous map `X ⋀ Y → Z` as a pointed continuous map `X → C⋆(Y, Z)`.
+    If `Y` is locally compact, this is a bijection and carries an adjunction of functors `- ⋀ Y  ⊣ C⋆(Y, -)` . -/
+def curry (f : C⋆(Y ⋀ Z, W)) : C⋆(Y, C⋆(Z, W)) where
+  continuous_toFun:= continuous_curry' f
+  pointed_toFun:= pointed_curry' f
+
+@[simp]
+theorem curry_apply (f : C⋆(Y ⋀ Z, W)) (y : Y) (z : Z) : f.curry y z = f (y ∧'z) :=
+  rfl
+
+
+
+/- ORIGINAL FILE FOR Continuous.curry: NOT MY CODE!!!
+
+
+/-- To show continuity of a map `X → C(Y, Z)`, it suffices to show that its uncurried form
+    `X × Y → Z` is continuous. -/
+theorem continuous_of_continuous_uncurry (f : X → C(Y, Z))
+    (h : Continuous (Function.uncurry fun x y => f x y)) : Continuous f :=
+  continuous_curry' ⟨_, h⟩
+
+
+
+
+
+/-- The currying process is a continuous map between function spaces. -/
+theorem continuous_curry [LocallyCompactSpace (X × Y)] :
+    Continuous (curry : C(X × Y, Z) → C(X, C(Y, Z))) := by
+  apply continuous_of_continuous_uncurry
+  apply continuous_of_continuous_uncurry
+  rw [← (Homeomorph.prodAssoc _ _ _).symm.comp_continuous_iff']
+  exact continuous_eval
+
+
+/-- The uncurried form of a continuous map `X → C(Y, Z)` is a continuous map `X × Y → Z`. -/
+theorem continuous_uncurry_of_continuous [LocallyCompactSpace Y] (f : C(X, C(Y, Z))) :
+    Continuous (Function.uncurry fun x y => f x y) :=
+  continuous_eval.comp <| f.continuous.prod_map continuous_id
+
+
+/-- The uncurried form of a continuous map `X → C(Y, Z)` as a continuous map `X × Y → Z` (if `Y` is
+    locally compact). If `X` is also locally compact, then this is a homeomorphism between the two
+    function spaces, see `Homeomorph.curry`. -/
+@[simps]
+def uncurry [LocallyCompactSpace Y] (f : C(X, C(Y, Z))) : C(X × Y, Z) :=
+  ⟨_, continuous_uncurry_of_continuous f⟩
+
+
+/-- The uncurrying process is a continuous map between function spaces. -/
+theorem continuous_uncurry [LocallyCompactSpace X] [LocallyCompactSpace Y] :
+    Continuous (uncurry : C(X, C(Y, Z)) → C(X × Y, Z)) := by
+  apply continuous_of_continuous_uncurry
+  rw [← (Homeomorph.prodAssoc _ _ _).comp_continuous_iff']
+  apply continuous_eval.comp (continuous_eval.prod_map continuous_id)
+
+-/
 
 
 
 
 
 
+
+
+
+-- [ TODO ] Currying is an equivalence
+
+
+-- [ TODO ] Naturality
+
+end PointedMap
 
 end adjunction
 
@@ -1539,16 +1675,16 @@ def sus_to_sphere_homeo: S (𝕊 n)  ≃ₜ (𝕊 (n+1))  := by{
   apply Continuous.homeoOfEquivCompactToT2 (continuous_sus_to_sphere n)
 }
 
--- add inhabited part; this is a pointed homeomorphism
+-- add pointed
 
 
 
 /- Ideal, partial todo list:
--- suspension as smashing with S^1
--- suspension of S^n is S^{n+1}
--- free and reduced suspension are homotopy equivalent (I THINK THIS ONLY HOLDS FOR CW COMPLEXES SO NO)
--- adjunction with loop (depending on difficulty, either the smash version or just the suspension version)
--- time permitting, more related and basic topological things that are missing
+-- suspension as smashing with S^1 [Done]
+-- suspension of S^n is S^{n+1} [very roughly sketched above]
+-- free and reduced suspension are homotopy equivalent [I THINK THIS ONLY HOLDS FOR CW COMPLEXES SO NO]
+-- adjunction with loop (depending on difficulty, either the smash version or just the suspension version) [Doing the general version] [TODO compose the correct maps to get the special case]
+-- time permitting, more related and basic topological things that are missing [I don't think time permits]
 
 Some things about the mapping cone seem to be in Mathlib in abstract nonsense form (I should check more carefully), maybe define mapping cones and show they fit the nonsense?
 -/

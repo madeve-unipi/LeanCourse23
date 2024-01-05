@@ -4,11 +4,16 @@ open Topology TopologicalSpace Set Filter
 /-!
 
 # Warning: Derivative Content
-This file is an adaptation of some of the content of the existing Mathlib file for homeomorphisms:
-  mathlib4/Mathlib/Topology/Homeomorph.lean
-The original Mathlib file is by Johannes Hölzl, Patrick Massot, Sébastien Gouëzel, Zhouhang Zhou, Reid Barton
+This file is an adaptation of some of the content of the existing Mathlib files for continuous functions and homeomorphisms, namely
 
-A further reference is the following:
+  mathlib4/Mathlib/Topology/ContinuousFunction/Basic.lean
+  by Nicolò Cavalleri
+
+  mathlib4/Mathlib/Topology/Homeomorph.lean
+  by Johannes Hölzl, Patrick Massot, Sébastien Gouëzel, Zhouhang Zhou, Reid Barton
+
+Further references are:
+  https://leanprover-community.github.io/mathlib4_docs/Mathlib/Data/FunLike/Basic.html
   https://leanprover-community.github.io/mathlib4_docs/Mathlib/Data/FunLike/Equiv.html
 
 
@@ -25,37 +30,99 @@ We denote pointed homeomorphisms with the notation ` ≃ₜ⋆ `
 
 -/
 
-/- I don't think I ever need this
-
-/-- Pointed functions between two pointed (i.e. inhabited) types -/
-structure Pointed_Map (X: Type*) (Y: Type*) [Inhabited X] [Inhabited Y] where
-  /-- The carrier function of the structure-/
-  function : X → Y
-  /-- A pointed function maps the basepoint to the basepoint-/
-  pointed : function default = default
-
-@[inherit_doc]
-infixl:25 " ≃ₚ " => Pointed_Map
-
-
 
 variable (X:Type*) [TopologicalSpace X] [Inhabited X]
 variable (Y:Type*) [TopologicalSpace Y] [Inhabited Y]
-variable (f: X → Y)
+
+/- Extending mathlib4/Mathlib/Topology/ContinuousFunction/Basic.lean -/
 
 
-/-- Pointed continuous function between two pointed topological spaces `X` and `Y` -/
-structure PointedMorph
-  extends Continuous f where
-  pointed_fun : f default = default := by simp
+/--Pointed continuous functions between `X` and `Y`-/
+structure PointedMap
+    extends C(X, Y) where
+  /-The underlying function maps the base point of the domain to the base point of the target-/
+  pointed_toFun : toFun default = default := by simp
 
-@[inherit_doc]
-infixl:25 " →ₜ⋆ " => PointedMorph
 
+/-ISSUE HERE:
+
+-- toFun is protected in ContinuousMap, which I think is the reason why PointedMap.toFun does not work
+#check PointedMap.pointed_toFun
+#check (PointedMap.toContinuousMap)
+#check (PointedMap.toContinuousMap _).toFun
+#check PointedMap.toFun
+
+-- But then if I try to define toFun manually it tells me the structure already has that field!
+protected def PointedMap.toFun := (PointedMap.toContinuousMap _).toFun
 -/
 
-variable (X:Type*) [TopologicalSpace X] [Inhabited X]
-variable (Y:Type*) [TopologicalSpace Y] [Inhabited Y]
+
+
+@[inherit_doc]
+infixl:25 " →ₜ⋆ " => PointedMap
+
+notation "C⋆" "(" A "," B ")" => PointedMap A B
+
+namespace PointedMap
+
+
+class PointedMapClass (F : Type*) (A B : outParam <| Type*) [TopologicalSpace A] [Inhabited A] [TopologicalSpace B] [Inhabited B]
+   extends ContinuousMapClass F A B where
+  /--Pointed maps have to be pointed, i.e. map the base point to the base point -/
+  map_pointed : ∀ (f : F), f default = default
+
+variable {X Y} in
+@[simp] lemma map_pointed {F: Type*} [PointedMapClass F X Y] (f : F) : f default = default := PointedMapClass.map_pointed f
+
+theorem toContinuousMap_injective : Function.Injective (toContinuousMap: (X →ₜ⋆ Y ) → C(X, Y))
+  | ⟨_, _⟩, ⟨_, _⟩, rfl => rfl
+
+theorem toFun_injective : Function.Injective (ContinuousMap.toFun ∘ toContinuousMap : (X →ₜ⋆ Y) → (X → Y) ) := by{
+  apply Function.Injective.comp
+  · apply FunLike.coe_injective'
+  · exact toContinuousMap_injective X Y
+}
+
+instance : PointedMapClass (PointedMap X Y) X Y :=
+  { coe := fun f ↦ (PointedMap.toContinuousMap f).toFun,
+    coe_injective' := toFun_injective X Y
+    map_continuous := by {
+      intro f
+      apply (PointedMap.toContinuousMap f).continuous_toFun
+    }
+    map_pointed := PointedMap.pointed_toFun }
+
+
+instance : CoeFun (X →ₜ⋆ Y) fun _ ↦ X → Y := ⟨FunLike.coe⟩
+
+@[ext] theorem ext {f g: X →ₜ⋆ Y} (h : ∀ x, f x = g x) : f = g := FunLike.ext f g h
+
+
+protected def copy (f : PointedMap X Y) (f' : X → Y) (h : f' = ⇑f) : PointedMap X Y :=
+  { toFun := f',
+    pointed_toFun := by simp[h]
+  }
+
+
+@[simp] theorem pointedmap_mk_coe (a : X →ₜ⋆ Y) (b) : (PointedMap.mk a b: X → Y) = a :=
+  rfl
+
+@[simp] theorem pointedhomeo_mk_coe' (a : X →ₜ⋆ Y) (b c) : (PointedMap.mk (ContinuousMap.mk a b) c: X → Y) = a :=
+  rfl
+
+
+/--The subspace topology induced by the compact-open topology on the type of pointed continuous maps.-/
+protected def compactOpen :TopologicalSpace (C⋆(X, Y)) := TopologicalSpace.induced (PointedMap.toContinuousMap : C⋆(X,Y) → C(X,Y)) ContinuousMap.compactOpen
+
+/--The constant map to the basepoint on the target as a pointed continuous map-/
+protected def trivial : C⋆(X, Y) where
+  toFun := fun _ ↦ default
+
+
+
+-- [TODO] Adapt more of the original file
+
+end PointedMap
 
 /-- Pointed homeomorphism between `X` and `Y`, i.e. isomorphism in the category of pointed topological spaces -/
 structure PointedHomeo
@@ -67,13 +134,12 @@ structure PointedHomeo
 @[inherit_doc]
 infixl:25 " ≃ₜ⋆ " => PointedHomeo
 
+
 namespace PointedHomeo
 variable{X Y}
 variable {Z: Type*} [TopologicalSpace Z] [Inhabited Z]
 
 variable (h: X ≃ₜ⋆ Y )
-#check h.toEquiv
-#check h.toHomeomorph
 
 
 @[simp] theorem pointed_invFun (f: X ≃ₜ⋆ Y) : f.invFun default = default := by{
@@ -114,9 +180,15 @@ instance : CoeFun (X ≃ₜ⋆ Y) fun _ ↦ X → Y := ⟨FunLike.coe⟩
 @[ext] theorem ext {f g: X ≃ₜ⋆ Y} (h : ∀ x, f x = g x) : f = g := FunLike.ext f g h
 
 
--- Do I have to do the rest of the things that are suggested in
--- https://leanprover-community.github.io/mathlib4_docs/Mathlib/Data/FunLike/Equiv.html#EquivLike
--- ???
+/-
+Do I have to do the rest of the things that are suggested in
+https://leanprover-community.github.io/mathlib4_docs/Mathlib/Data/FunLike/Equiv.html#EquivLike
+to turn it into a class too???
+
+Similar to what is done for PointedMap
+
+I don't think I strictly need this
+-/
 
 
 -- Here, Pointedhomeo.mk makes a homeo into a pointed homeo, not an equiv into a homeo
@@ -136,8 +208,8 @@ instance : CoeFun (X ≃ₜ⋆ Y) fun _ ↦ X → Y := ⟨FunLike.coe⟩
 
 /--The trivial pointed isomorphism between two pointed spaces made of a single point-/
 protected def trivial [Unique X] [Unique Y]: X ≃ₜ⋆ Y where
-  toFun := fun x ↦ default
-  invFun := fun y ↦ default
+  toFun := fun _ ↦ default
+  invFun := fun _ ↦ default
   left_inv := by simp[Function.LeftInverse]
   right_inv := by simp[Function.RightInverse, Function.LeftInverse]
 
@@ -226,14 +298,14 @@ theorem refl_symm : (PointedHomeo.refl X).symm = PointedHomeo.refl X :=
   rfl
 
 
-/- Again, the following should morally be redundant by what we have now
+/- Again, the following should be redundant by what we have now
 
 theorem pointed_comp {Z:Type*} [TopologicalSpace Z] [Inhabited Z] (f: X → Y) (g: Y → Z) (hf: f default = default) (hg: g default = default) : (g ∘ f) default = default := by{
   simp[hf, hg]
 }
 -/
 
--- ARE THE NEXT TWO LEMMAS ABOUT CONTINUITY EVEN NEEDED SINCE WE ARE EXTENDING HOMEO?
+
 @[continuity]
 protected theorem continuous (h : X ≃ₜ⋆  Y) : Continuous h :=
   h.continuous_toFun
@@ -347,12 +419,15 @@ end Embeddings
 end PointedHomeo
 /-
 Final comments:
-- The original source does a bunch of #align things and I don't understand what those are supposed to do
+
+- [TODO] Declare some coercion from PointedHomeo to PointedMap
+- [TODO] Do I need more simp lemmas for PointedMap?
+- [TODO] Rephrase the embedding Y ⋁ Z → Y × Z in Suspension.lean in terms of the Embeddings section here
+
 
 - Should this file be made compatible with
 https://github.com/leanprover-community/mathlib4/blob/8666bd82efec40b8b3a5abca02dc9b24bbdf2652/Mathlib/CategoryTheory/Category/Pointed.lean#L29-L33
 ???
 -/
-
 
 --#lint
