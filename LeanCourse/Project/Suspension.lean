@@ -3,6 +3,8 @@ import Mathlib.Topology.Instances.Real
 import Mathlib.AlgebraicTopology.FundamentalGroupoid.FundamentalGroup
 import Mathlib.Analysis.InnerProductSpace.PiL2
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Complex
+import Mathlib.CategoryTheory.Category.Pointed
+import Mathlib.Topology.CompactOpen
 import LeanCourse.Project.Pointed
 open BigOperators Function Set Filter Topology TopologicalSpace CategoryTheory
 
@@ -20,20 +22,22 @@ Done:
 - Defined the free suspension of a space
 - Defined the suspension of a function
 - Defined the based cylinder and the pointed suspension of a pointed space
-- Defined the wedge product Y ⋁ Z of two pointed spaces Y and Z
+- Defined the wedge product X ⋁ Y of two pointed spaces X and Y
 - Some lemmas to deal with wedge products more easily
-- Constructed an embedding Y ⋁ Z ↪ Y × Z and showed it is an embedding
-- Defined the smash product Y ⋀ Z of two pointed spaces Y and Z
+- Constructed an embedding X ⋁ Y ↪ X × Y and showed it is an embedding
+- Defined the smash product X ⋀ Y of two pointed spaces X and Y
 - Started some work on spheres [EXTREMELY BROKEN; NOT IN A DECENT STATE YET]
 
 To do:
 - See comment at the end
 
 Things that should be polished:
-- Divide the content into sections, e.g. unpointed vs pointed. Specifically, also have the pointed spaces be X and Y instead of Y and Z
+- Divide the content into sections, e.g. unpointed vs pointed. Specifically, also have the pointed spaces be X and X instead of X and Y
 - Deal with the implicit/explicit variable mess in the lemmas. Some are fine, some don't really need to be explicit
 -/
 
+
+section unpointed_spaces
 
 variable {X: Type*} [TopologicalSpace X]
 variable {X': Type*} [TopologicalSpace X']
@@ -58,11 +62,18 @@ def quotient_setoid (A: Set X) : Setoid (X) where
     }
   }
 
-lemma quotient_setoid_equiv_iff (A: Set X) (x y : X) : (quotient_setoid A).r x y ↔ ((x ∈ A ∧ y ∈ A) ∨ x = y ) := by {
+
+@[simp] theorem quotient_setoid_equiv_iff (A: Set X) (x y : X) : (quotient_setoid A).r x y ↔ ((x ∈ A ∧ y ∈ A) ∨ x = y ) := by {
   exact Iff.rfl
 }
 
---define the setoid for taking a quotient in which to two disjoint subspaces A and B are collapsed to one point each
+@[simp] theorem quotient_setoid_equiv (A: Set X) (s: Setoid X) (h : s = quotient_setoid A) (x y : X) : x ≈ y ↔  ((x ∈ A ∧ y ∈ A) ∨ x = y ) := by {
+  have: s.r x y ↔ x ≈ y := by exact Iff.rfl
+  rw[← this]
+  simp[h]
+}
+
+/--define the setoid for taking a quotient in which to two disjoint subspaces A and B are collapsed to one point each-/
 def double_quotient_setoid {A B: Set X} (h: Disjoint A B) : Setoid (X) where
   r:= fun x ↦ fun y ↦ (x ∈ A ∧ y ∈ A) ∨ (x ∈ B ∧ y ∈ B) ∨ x = y
   iseqv := {
@@ -100,9 +111,10 @@ def double_quotient_setoid {A B: Set X} (h: Disjoint A B) : Setoid (X) where
     }
   }
 
+
 lemma double_quotient_setoid_equiv_iff {A B: Set X} (h: Disjoint A B) (x y : X) : (double_quotient_setoid h).r x y ↔ ((x ∈ A ∧ y ∈ A) ∨ (x ∈ B ∧ y ∈ B) ∨ x = y) := Iff.rfl
 
--- we will need to define functions X/∼  → Y/∼
+-- we will need to define functions X/∼  → X/∼
 def quotient_double_lift {A B : Type*} (S: Setoid A) (T: Setoid B) (f: A → B) (h: ∀ a₁ a₂ : A, S.r a₁ a₂ → T.r (f a₁) (f a₂)) : Quotient S → Quotient T := by {
   apply Quotient.lift (Quotient.mk T ∘ f)
   intro a₁ a₂ h12
@@ -245,70 +257,68 @@ def SuspensionFunctor : CategoryTheory.Functor TopCat TopCat where
 --[ TODO ] joins in general???
 
 
+end unpointed_spaces
 
+section pointed_spaces
 
---define the pointed cylinder of Y
-variable (Y:Type*) [TopologicalSpace Y] [Inhabited Y]
+--define the pointed cylinder of X
+variable (X:Type*) [TopologicalSpace X] [Inhabited X]
 
-def pointedcylinder_setoid : Setoid (Cylinder Y) := by{
-  exact quotient_setoid ({x : Cylinder Y | x.1 = default})
+def pointedcylinder_setoid : Setoid (Cylinder X) := by{
+  exact quotient_setoid ({p : Cylinder X | p.1 = default})
 }
 
 /--Pointed cylinder of a pointed topological space-/
-def PointedCylinder := Quotient (pointedcylinder_setoid Y)
+def PointedCylinder := Quotient (pointedcylinder_setoid X)
 
 --show PointedCylinder is a pointed topological space with basepoint * × I
-instance : TopologicalSpace (PointedCylinder Y) := instTopologicalSpaceQuotient
+instance : TopologicalSpace (PointedCylinder X) := instTopologicalSpaceQuotient
 
-instance : Inhabited (PointedCylinder Y) where
-  default := Quotient.mk (pointedcylinder_setoid Y) ((default : Y), 0)
+instance : Inhabited (PointedCylinder X) where
+  default := Quotient.mk (pointedcylinder_setoid X) ((default : X), 0)
 
 
---define the pointed suspension of Y
-def basedsuspension_setoid : Setoid (Cylinder Y) := by{
-  let A := {x : Cylinder Y | x.1 = default}
-  let B := {x : Cylinder Y | x.2 = 0}
-  let C := {x : Cylinder Y | x.2 = 1}
+--define the pointed suspension of X
+def basedsuspension_setoid : Setoid (Cylinder X) := by{
+  let A := {p : Cylinder X | p.1 = default}
+  let B := {p : Cylinder X | p.2 = 0}
+  let C := {p : Cylinder X | p.2 = 1}
   exact quotient_setoid (A ∪ B ∪ C)
 }
 
-def BasedSuspension := Quotient (basedsuspension_setoid Y)
-instance : TopologicalSpace (BasedSuspension Y) := instTopologicalSpaceQuotient
+def BasedSuspension := Quotient (basedsuspension_setoid X)
+instance : TopologicalSpace (BasedSuspension X) := instTopologicalSpaceQuotient
 
-instance : Inhabited (BasedSuspension Y) where
-  default:= Quotient.mk (basedsuspension_setoid Y) ((default:Y), 0)
+instance : Inhabited (BasedSuspension X) where
+  default:= Quotient.mk (basedsuspension_setoid X) ((default:X), 0)
 
 notation (priority:= high) "Σ₀" => BasedSuspension
 
 --[ TODO ] Define the based suspension functor and show it is a functor
 --[ TODO ] Define iterated suspensions
 
--- define the wedge product Y ⋁ Z of two pointed spaces Y and Z
+-- define the wedge product X ⋁ Y of two pointed spaces X and Y
+variable (Y:Type*) [TopologicalSpace Y] [Inhabited Y]
+instance: TopologicalSpace (X ⊕ Y) := by infer_instance
 
-
-variable (Z:Type*) [TopologicalSpace Z] [Inhabited Z]
-instance: TopologicalSpace (Y ⊕ Z) := by infer_instance
-
-def wedge_setoid : Setoid (Y ⊕ Z) := by{
-  let A: Set (Y ⊕ Z) := { x : Y ⊕ Z | x = Sum.inl (default:Y) ∨ x = Sum.inr (default:Z)}
+def wedge_setoid : Setoid (X ⊕ Y) := by{
+  let A: Set (X ⊕ Y) := { p : X ⊕ Y | p = Sum.inl (default:X) ∨ p = Sum.inr (default:Y)}
   exact quotient_setoid A
 }
 
 
-def Wedge := Quotient (wedge_setoid Y Z)
-instance: TopologicalSpace (Wedge Y Z) := by exact instTopologicalSpaceQuotient
-instance: Inhabited (Wedge Y Z) where
-  default:= Quotient.mk (wedge_setoid Y Z) (Sum.inl (default:Y))
+def Wedge := Quotient (wedge_setoid X Y)
+instance: TopologicalSpace (Wedge X Y) := by exact instTopologicalSpaceQuotient
+instance: Inhabited (Wedge X Y) where
+  default:= Quotient.mk (wedge_setoid X Y) (Sum.inl (default:X))
 
 infix:50 " ⋁ " => Wedge
 
 -- easy lemma for later
-lemma wedge_defaults_equiv: Quotient.mk (wedge_setoid Y Z) (Sum.inl default) = Quotient.mk (wedge_setoid Y Z) (Sum.inr default) := by{
-  let _hwedge := wedge_setoid Y Z
+lemma wedge_defaults_equiv: Quotient.mk (wedge_setoid X Y) (Sum.inl default) = Quotient.mk (wedge_setoid X Y) (Sum.inr default) := by{
+  let _hwedge := wedge_setoid X Y
   refine Quotient.eq.mpr ?_
-  have : (wedge_setoid Y Z).r (Sum.inl default) (Sum.inr default) := by{
-    simp[quotient_setoid_equiv_iff]
-  }
+  have : (wedge_setoid X Y).r (Sum.inl default) (Sum.inr default) := by simp
   exact this
 }
 
@@ -317,61 +327,60 @@ lemma wedge_defaults_equiv: Quotient.mk (wedge_setoid Y Z) (Sum.inl default) = Q
 
 -- Show that there is a homeomorphism X ⋁ Y ≃ Y ⋁ X
 
-lemma continuous_sum_swap: Continuous (@Sum.swap Y Z) := by{ --this looks like it should be a lemma from the library but I couldn't find it
+lemma continuous_sum_swap: Continuous (@Sum.swap X Y) := by{ --this looks like it should be a lemma from the library but I couldn't find it
   refine continuous_sum_dom.mpr ?_
   constructor
-  · have : (@Sum.swap Y Z) ∘ (@Sum.inl Y Z) = @Sum.inr Z Y := rfl
+  · have : (@Sum.swap X Y) ∘ (@Sum.inl X Y) = @Sum.inr Y X := rfl
     rw[this]
     exact continuous_inr
-  · have : (@Sum.swap Y Z) ∘ (@Sum.inr Y Z) = @Sum.inl Z Y := rfl
+  · have : (@Sum.swap X Y) ∘ (@Sum.inr X Y) = @Sum.inl Y X := rfl
     rw[this]
     exact continuous_inl
 }
 
 
-def sum_commutes: Y ⊕ Z ≃ₜ Z ⊕ Y where
-  toFun:= @Sum.swap Y Z
-  continuous_toFun := continuous_sum_swap Y Z
-  invFun:= @Sum.swap Z Y
-  continuous_invFun := continuous_sum_swap Z Y
+def sum_commutes: X ⊕ Y ≃ₜ Y ⊕ X where
+  toFun:= @Sum.swap X Y
+  continuous_toFun := continuous_sum_swap X Y
+  invFun:= @Sum.swap Y X
+  continuous_invFun := continuous_sum_swap Y X
   left_inv:= by simp
   right_inv:= by simp
 
 
 --TO REWRITE using subsequent standard way to map from wedge
-def wedge_swap: Y ⋁ Z → Z ⋁ Y := by{
-  let _hwedge := wedge_setoid Y Z
-  let _hwedge' := wedge_setoid Z Y
-  apply Quotient.lift ( (Quotient.mk (wedge_setoid Z Y)  ) ∘ (@Sum.swap Y Z))
+def wedge_swap: X ⋁ Y → Y ⋁ X := by{
+  let _hwedge := wedge_setoid X Y
+  let _hwedge' := wedge_setoid Y X
+  apply Quotient.lift ( (Quotient.mk (wedge_setoid Y X)  ) ∘ (@Sum.swap X Y))
   intro a b hab
+  -- I still have to take this extra step I don't want to take
   have hab2: Setoid.r a b := by exact hab
   simp [quotient_setoid_equiv_iff] at hab2
   obtain hc1|hc2 := hab2
   · induction a
-    case inl ya => {
+    case inl xa => {
       induction b
-      case inl yb => {
+      case inl xb => {
         simp at hc1
         simp[hc1]
       }
-      case inr zb => {
+      case inr yb => {
         simp at hc1
         simp[hc1]
-        have : Setoid.r (@Sum.inr Z Y default) (Sum.inl default) := by{
-          simp[quotient_setoid_equiv_iff]
-        }
+        have : Setoid.r (@Sum.inr Y X default) (Sum.inl default) := by simp
         exact this
       }
     }
-    case inr za => {
+    case inr ya => {
       induction b
-      case inl yb => {
+      case inl xb => {
         simp at hc1
         simp [hc1]
-        have : Setoid.r (@Sum.inl Z Y default) (Sum.inr default) := by simp[quotient_setoid_equiv_iff]
+        have : Setoid.r (@Sum.inl Y X default) (Sum.inr default) := by simp[quotient_setoid_equiv_iff]
         exact this
       }
-      case inr zb => {
+      case inr yb => {
         simp at hc1
         simp[hc1]
       }
@@ -379,43 +388,43 @@ def wedge_swap: Y ⋁ Z → Z ⋁ Y := by{
   · rw[hc2]
 }
 
-lemma continuous_wedge_swap : Continuous (wedge_swap Y Z) := by{
+lemma continuous_wedge_swap : Continuous (wedge_swap X Y) := by{
   apply Continuous.quotient_lift
   apply Continuous.comp
   · exact continuous_coinduced_rng
-  · exact continuous_sum_swap Y Z
+  · exact continuous_sum_swap X Y
 }
 
 
-lemma wedge_swap_inl (y:Y) : (wedge_swap Y Z) (Quotient.mk _ (Sum.inl y) ) = Quotient.mk _ (@Sum.inr Z Y y) := by{
+lemma wedge_swap_inl (y:X) : (wedge_swap X Y) (Quotient.mk _ (Sum.inl y) ) = Quotient.mk _ (@Sum.inr Y X y) := by{
   simp[wedge_swap]
   apply Quot.lift_mk
   exact fun a₁ a₂ a ↦ a
 }
 
 
-lemma wedge_swap_inr (z:Z) : (wedge_swap Y Z) (Quotient.mk _ (Sum.inr z) ) = Quotient.mk _ (@Sum.inl Z Y z) := by{
+lemma wedge_swap_inr (z:Y) : (wedge_swap X Y) (Quotient.mk _ (Sum.inr z) ) = Quotient.mk _ (@Sum.inl Y X z) := by{
   simp[wedge_swap]
   apply Quot.lift_mk
   exact fun a₁ a₂ a ↦ a
 }
 
 
-def wedge_commutes: Y ⋁ Z ≃ₜ Z ⋁ Y where
-  toFun:= wedge_swap Y Z
-  continuous_toFun := continuous_wedge_swap Y Z
-  invFun:= wedge_swap Z Y
-  continuous_invFun := continuous_wedge_swap Z Y
+def wedge_commutes: X ⋁ Y ≃ₜ Y ⋁ X where
+  toFun:= wedge_swap X Y
+  continuous_toFun := continuous_wedge_swap X Y
+  invFun:= wedge_swap Y X
+  continuous_invFun := continuous_wedge_swap Y X
   left_inv:= by {
-    let _hwedge := wedge_setoid Y Z
-    let _hwedge' := wedge_setoid Z Y
+    let _hwedge := wedge_setoid X Y
+    let _hwedge' := wedge_setoid Y X
     simp[LeftInverse]
-    intro x
-    obtain ⟨x', hx'⟩ := Quotient.exists_rep x
-    rw[← hx']
-    induction x'
+    intro p
+    obtain ⟨p', hp'⟩ := Quotient.exists_rep p
+    rw[← hp']
+    induction p'
     case inl y => {
-      rw[wedge_swap_inl Y Z y]
+      rw[wedge_swap_inl X Y y]
       rw[wedge_swap_inr]
     }
     case inr z => {
@@ -424,10 +433,10 @@ def wedge_commutes: Y ⋁ Z ≃ₜ Z ⋁ Y where
   }
   right_inv:= by {
     simp[Function.RightInverse, LeftInverse]
-    intro x
-    obtain ⟨x', hx'⟩ := Quotient.exists_rep x
-    rw[← hx']
-    induction x'
+    intro p
+    obtain ⟨p', hp'⟩ := Quotient.exists_rep p
+    rw[← hp']
+    induction p'
     case inl y => {
       rw[wedge_swap_inl, wedge_swap_inr]
     }
@@ -439,37 +448,37 @@ def wedge_commutes: Y ⋁ Z ≃ₜ Z ⋁ Y where
 
 
 --"The wedge product is the coproduct in pointed topological spaces"
-variable {Y Z} in
-def wedge_induced {W: Type*} [TopologicalSpace W] [Inhabited W] {f: Y → W} {g: Z → W} (hf: f default = default) (hg: g default = default) : Y ⋁ Z → W := by {
-  let _ := wedge_setoid Y Z
-  let sum_map : Y ⊕ Z → W := fun
-    | .inl y => f y
-    | .inr z => g z
+variable {X Y} in
+def wedge_induced {Z: Type*} [TopologicalSpace Z] [Inhabited Z] {f: X → Z} {g: Y → Z} (hf: f default = default) (hg: g default = default) : X ⋁ Y → Z := by {
+  let _ := wedge_setoid X Y
+  let sum_map : X ⊕ Y → Z := fun
+    | .inl x => f x
+    | .inr y => g y
   apply Quotient.lift sum_map
   intro a b hab
-  have : (wedge_setoid Y Z).r a b := hab
+  have : (wedge_setoid X Y).r a b := hab
   simp[wedge_setoid, quotient_setoid_equiv_iff] at this
   induction a
-  case inl ya => {
+  case inl xa => {
     induction b
-    case inl yb => {
+    case inl xb => {
       simp at this
       obtain hc1|hc2:= this
       · simp[hc1]
       · simp[hc2]
     }
-    case inr zb => {
+    case inr yb => {
       simp at this
       simp[this, hf, hg]
     }
   }
-  case inr za => {
+  case inr ya => {
     induction b
-    case inl yb => {
+    case inl xb => {
       simp at this
       simp[this, hf, hg]
     }
-    case inr zb => {
+    case inr yb => {
       simp at this
       obtain hc1|hc2:= this
       · simp[hc1]
@@ -479,8 +488,8 @@ def wedge_induced {W: Type*} [TopologicalSpace W] [Inhabited W] {f: Y → W} {g:
 }
 
 
-variable {Y Z} in
-lemma continuous_wedge_induced {W: Type*} [TopologicalSpace W] [Inhabited W] {f: Y → W} {g: Z → W} {hf: f default = default} {hg: g default = default} (hf2: Continuous f) (hg2: Continuous g) : Continuous (wedge_induced hf hg) := by{
+variable {X Y} in
+lemma continuous_wedge_induced {Z: Type*} [TopologicalSpace Z] [Inhabited Z] {f: X → Z} {g: Y → Z} {hf: f default = default} {hg: g default = default} (hf2: Continuous f) (hg2: Continuous g) : Continuous (wedge_induced hf hg) := by{
   apply Continuous.quotient_lift
   simp [continuous_sum_dom]
   constructor
@@ -488,47 +497,47 @@ lemma continuous_wedge_induced {W: Type*} [TopologicalSpace W] [Inhabited W] {f:
   · exact hg2
 }
 
-variable {Y Z} in
-lemma pointed_wedge_induced {W: Type*} [TopologicalSpace W] [Inhabited W] {f: Y → W} {g: Z → W} {hf: f default = default} {hg: g default = default} : wedge_induced hf hg default = default := by{
-  let _ := wedge_setoid Y Z
-  have : (default : Y ⋁ Z) = Quotient.mk (wedge_setoid Y Z) (Sum.inl (default:Y)) := rfl
+variable {X Y} in
+lemma pointed_wedge_induced {Z: Type*} [TopologicalSpace Z] [Inhabited Z] {f: X → Z} {g: Y → Z} {hf: f default = default} {hg: g default = default} : wedge_induced hf hg default = default := by{
+  let _ := wedge_setoid X Y
+  have : (default : X ⋁ Y) = Quotient.mk (wedge_setoid X Y) (Sum.inl (default:X)) := rfl
   rw[this]
   simp[wedge_induced, Quotient.lift_mk]
   exact hf
 }
 
 
-def wedge_inl : Y → Y ⋁ Z := (Quotient.mk (wedge_setoid Y Z)) ∘ Sum.inl
-def wedge_inr : Z → Y ⋁ Z := (Quotient.mk (wedge_setoid Y Z)) ∘ Sum.inr
+def wedge_inl : X → X ⋁ Y := (Quotient.mk (wedge_setoid X Y)) ∘ Sum.inl
+def wedge_inr : Y → X ⋁ Y := (Quotient.mk (wedge_setoid X Y)) ∘ Sum.inr
 
-lemma continuous_wedge_inl : Continuous (wedge_inl Y Z) := by{
+lemma continuous_wedge_inl : Continuous (wedge_inl X Y) := by{
   apply Continuous.comp
   · exact continuous_coinduced_rng
   · exact continuous_inl
 }
 
-lemma continuous_wedge_inr : Continuous (wedge_inr Y Z) := by{
+lemma continuous_wedge_inr : Continuous (wedge_inr X Y) := by{
   apply Continuous.comp
   · exact continuous_coinduced_rng
   · exact continuous_inr
 }
 
-lemma pointed_wedge_inl: wedge_inl Y Z default = default := by{
+lemma pointed_wedge_inl: wedge_inl X Y default = default := by{
   simp[wedge_inl]
   rfl
 }
 
-lemma pointed_wedge_inr: wedge_inr Y Z default = default := by{
+lemma pointed_wedge_inr: wedge_inr X Y default = default := by{
   simp[wedge_inr]
   rw[← wedge_defaults_equiv]
   rfl
 }
 
 
---Show that Y ≃ₜ⋆  W implies Y ⋁ Z ≃ₜ⋆  W ⋁ Z
-def homeo_wedge_swap {W: Type*} [TopologicalSpace W] [Inhabited W] (f: Y ≃ₜ⋆ W) : Y ⋁ Z ≃ₜ⋆ W ⋁ Z  where
+--Show that X ≃ₜ⋆ Z implies X ⋁ Y ≃ₜ⋆  Z ⋁ Y
+def homeo_wedge_swap {Z: Type*} [TopologicalSpace Z] [Inhabited Z] (f: X ≃ₜ⋆ Z) : X ⋁ Y ≃ₜ⋆ Z ⋁ Y  where
   toFun:= by{
-    apply @wedge_induced Y _ Z _ (W ⋁ Z) _ _ ((wedge_inl W Z) ∘ f.toFun) (wedge_inr W Z) ?_ ?_
+    apply @wedge_induced X _ Y _ (Z ⋁ Y) _ _ ((wedge_inl Z Y) ∘ f.toFun) (wedge_inr Z Y) ?_ ?_
     · rw[Function.comp, f.pointed_toFun]
       rfl
     · simp[wedge_inr]
@@ -539,13 +548,13 @@ def homeo_wedge_swap {W: Type*} [TopologicalSpace W] [Inhabited W] (f: Y ≃ₜ�
     dsimp
     apply continuous_wedge_induced
     · apply Continuous.comp
-      · exact continuous_wedge_inl W Z
+      · exact continuous_wedge_inl Z Y
       · exact f.continuous_toFun
-    · exact continuous_wedge_inr W Z
+    · exact continuous_wedge_inr Z Y
   }
 
   invFun:= by{
-    apply @wedge_induced W _ Z _ (Y ⋁ Z) _ _ ((wedge_inl Y Z) ∘ f.invFun) (wedge_inr Y Z) ?_ ?_
+    apply @wedge_induced Z _ Y _ (X ⋁ Y) _ _ ((wedge_inl X Y) ∘ f.invFun) (wedge_inr X Y) ?_ ?_
     · rw[Function.comp, f.pointed_invFun]
       rfl
     · simp[wedge_inr]
@@ -557,14 +566,14 @@ def homeo_wedge_swap {W: Type*} [TopologicalSpace W] [Inhabited W] (f: Y ≃ₜ�
     dsimp
     apply continuous_wedge_induced
     · apply Continuous.comp
-      · exact continuous_wedge_inl Y Z
+      · exact continuous_wedge_inl X Y
       · exact f.continuous_invFun
-    · exact continuous_wedge_inr Y Z
+    · exact continuous_wedge_inr X Y
   }
 
   left_inv:= by {
-    let _ := wedge_setoid Y Z
-    let _ := wedge_setoid W Z
+    let _ := wedge_setoid X Y
+    let _ := wedge_setoid Z Y
     simp[LeftInverse]
     intro x
     simp[wedge_induced]
@@ -580,8 +589,8 @@ def homeo_wedge_swap {W: Type*} [TopologicalSpace W] [Inhabited W] (f: Y ≃ₜ�
   }
   right_inv:= by {
     dsimp
-    let _ := wedge_setoid Y Z
-    let _ := wedge_setoid W Z
+    let _ := wedge_setoid X Y
+    let _ := wedge_setoid Z Y
     simp[Function.RightInverse, LeftInverse]
     intro x
     simp[wedge_induced]
@@ -597,27 +606,27 @@ def homeo_wedge_swap {W: Type*} [TopologicalSpace W] [Inhabited W] (f: Y ≃ₜ�
   }
 
   pointed_toFun := by{
-    let _ := wedge_setoid Y Z
+    let _ := wedge_setoid X Y
     dsimp
     simp[wedge_induced]
-    have : (default: Y ⋁ Z) = Quotient.mk (wedge_setoid Y Z) (Sum.inl (default:Y)) := rfl
+    have : (default: X ⋁ Y) = Quotient.mk (wedge_setoid X Y) (Sum.inl (default:X)) := rfl
     rw[this]
     simp[Quotient.lift_mk]
     have hf:= f.pointed_toFun
     dsimp at hf
     rw[hf]
-    exact pointed_wedge_inl W Z
+    exact pointed_wedge_inl Z Y
   }
 
 
 
 -- Show that there is an embedding of the wedge product inside the topological product X × Y
 -- THIS CAN PROBABLY BE REWRITTEN USING THE COPRODUCT PROPERTY ABOVE
-def coprod_prod_map : Y ⊕ Z → Y × Z := fun
-  | .inl y => (y, (default:Z))
-  | .inr z => ((default:Y), z)
+def coprod_prod_map : X ⊕ Y → X × Y := fun
+  | .inl x => (x, (default:Y))
+  | .inr y => ((default:X), y)
 
-lemma coprod_prod_map_cont: Continuous (coprod_prod_map Y Z) := by {
+lemma coprod_prod_map_cont: Continuous (coprod_prod_map X Y) := by {
   simp[coprod_prod_map, continuous_sum_dom]
   constructor
   · constructor
@@ -629,15 +638,37 @@ lemma coprod_prod_map_cont: Continuous (coprod_prod_map Y Z) := by {
 }
 
 
-def wedge_embedding : Y ⋁ Z → Y × Z := by {
-  apply Quotient.lift (coprod_prod_map Y Z)
+def wedge_embedding : X ⋁ Y → X × Y := by {
+  apply Quotient.lift (coprod_prod_map X Y)
   intro a b hab
-  have hab2 : (wedge_setoid Y Z).r a b := hab
+  have hab2 : (wedge_setoid X Y).r a b := hab
 
   induction a
-  case inl ya => {
+  case inl xa => {
     induction b
-    case inl yb => {
+    case inl xb => {
+      simp[coprod_prod_map]
+      simp[quotient_setoid_equiv_iff] at hab2
+      obtain hc1|hc2 := hab2
+      · calc
+        xa = default := hc1.1
+        _ = xb := by{symm; exact hc1.2}
+      · assumption
+    }
+    case inr yb => {
+      simp[coprod_prod_map]
+      simp[quotient_setoid_equiv_iff] at hab2
+      tauto
+    }
+  }
+  case inr ya => {
+    induction b
+    case inl xb => {
+      simp[coprod_prod_map]
+      simp[quotient_setoid_equiv_iff] at hab2
+      tauto
+    }
+    case inr yb => {
       simp[coprod_prod_map]
       simp[quotient_setoid_equiv_iff] at hab2
       obtain hc1|hc2 := hab2
@@ -646,47 +677,25 @@ def wedge_embedding : Y ⋁ Z → Y × Z := by {
         _ = yb := by{symm; exact hc1.2}
       · assumption
     }
-    case inr zb => {
-      simp[coprod_prod_map]
-      simp[quotient_setoid_equiv_iff] at hab2
-      tauto
-    }
-  }
-  case inr za => {
-    induction b
-    case inl yb => {
-      simp[coprod_prod_map]
-      simp[quotient_setoid_equiv_iff] at hab2
-      tauto
-    }
-    case inr zb => {
-      simp[coprod_prod_map]
-      simp[quotient_setoid_equiv_iff] at hab2
-      obtain hc1|hc2 := hab2
-      · calc
-        za = default := hc1.1
-        _ = zb := by{symm; exact hc1.2}
-      · assumption
-    }
   }
 }
 
 -- prove this is an embedding
-lemma wedge_embedding_cont: Continuous (wedge_embedding Y Z) := by{
+lemma wedge_embedding_cont: Continuous (wedge_embedding X Y) := by{
   apply Continuous.quotient_lift
-  exact coprod_prod_map_cont Y Z
+  exact coprod_prod_map_cont X Y
 }
 
 
-lemma wedge_embedding_inducing: Inducing (wedge_embedding Y Z) := by{
-  let _ := wedge_setoid Y Z
+lemma wedge_embedding_inducing: Inducing (wedge_embedding X Y) := by{
+  let _ := wedge_setoid X Y
   rw[inducing_iff]
   refine TopologicalSpace.ext_iff.mpr ?left.a
   intro A
   constructor
   · intro hA
     apply isOpen_induced_iff.mpr
-    let A' := (Quotient.mk (wedge_setoid Y Z))⁻¹' A
+    let A' := (Quotient.mk (wedge_setoid X Y))⁻¹' A
     let B := Sum.inl⁻¹' A'
     let C := Sum.inr⁻¹' A'
     have hApre: IsOpen B ∧ IsOpen C := hA
@@ -694,86 +703,86 @@ lemma wedge_embedding_inducing: Inducing (wedge_embedding Y Z) := by{
     · use B ×ˢ C
       constructor
       · exact IsOpen.prod hApre.1 hApre.2
-      · ext x
+      · ext p
         constructor
-        · intro hx
-          rw[Set.mem_preimage] at hx
-          obtain ⟨x', hx'⟩ := Quotient.exists_rep x
-          rw[← hx'] at hx
-          induction x'
-          case inl y => {
-            simp[wedge_embedding, coprod_prod_map] at hx
-            rw[← hx']
-            exact hx.1
+        · intro hp
+          rw[Set.mem_preimage] at hp
+          obtain ⟨p', hp'⟩ := Quotient.exists_rep p
+          rw[← hp'] at hp
+          induction p'
+          case inl x => {
+            simp[wedge_embedding, coprod_prod_map] at hp
+            rw[← hp']
+            exact hp.1
           }
-          case inr z => {
-            simp[wedge_embedding, coprod_prod_map] at hx
-            rw[← hx']
-            exact hx.2
+          case inr y => {
+            simp[wedge_embedding, coprod_prod_map] at hp
+            rw[← hp']
+            exact hp.2
           }
-        · intro hx
+        · intro hp
           rw[Set.mem_preimage]
-          obtain ⟨x', hx'⟩ := Quotient.exists_rep x
-          rw[← hx']
-          induction x'
-          case inl y => {
+          obtain ⟨p', hp'⟩ := Quotient.exists_rep p
+          rw[← hp']
+          induction p'
+          case inl x => {
             simp[wedge_embedding, coprod_prod_map]
             constructor
-            · exact mem_of_eq_of_mem hx' hx
+            · exact mem_of_eq_of_mem hp' hp
             · rw[← wedge_defaults_equiv]
               exact hcase
           }
-          case inr z => {
+          case inr y => {
             simp[wedge_embedding, coprod_prod_map]
             constructor
             · exact hcase
-            · exact mem_of_eq_of_mem hx' hx
+            · exact mem_of_eq_of_mem hp' hp
           }
     · use B ×ˢ univ ∪ univ ×ˢ C
       constructor
       · apply IsOpen.union
         · exact IsOpen.prod hApre.1 isOpen_univ
         · exact IsOpen.prod isOpen_univ hApre.2
-      · ext x
+      · ext p
         constructor
-        · intro hx
-          rw[Set.mem_preimage] at hx
-          obtain ⟨x', hx'⟩ := Quotient.exists_rep x
-          rw[← hx'] at hx
-          induction x'
-          case inl y => {
-            simp[wedge_embedding, coprod_prod_map] at hx
-            obtain hx1|hx2 := hx
-            · exact mem_of_eq_of_mem (id hx'.symm) hx1
+        · intro hp
+          rw[Set.mem_preimage] at hp
+          obtain ⟨p', hp'⟩ := Quotient.exists_rep p
+          rw[← hp'] at hp
+          induction p'
+          case inl x => {
+            simp[wedge_embedding, coprod_prod_map] at hp
+            obtain hp1|hp2 := hp
+            · exact mem_of_eq_of_mem (id hp'.symm) hp1
             · have : default ∈ A := by {
-                rw[← wedge_defaults_equiv] at hx2
-                exact hx2
+                rw[← wedge_defaults_equiv] at hp2
+                exact hp2
                 }
               contradiction
           }
-          case inr z => {
-            simp[wedge_embedding, coprod_prod_map] at hx
-            obtain hx1|hx2 := hx
-            · have : default ∈ A := by exact hx1
+          case inr y => {
+            simp[wedge_embedding, coprod_prod_map] at hp
+            obtain hp1|hp2 := hp
+            · have : default ∈ A := by exact hp1
               contradiction
-            · exact mem_of_eq_of_mem (id hx'.symm) hx2
+            · exact mem_of_eq_of_mem (id hp'.symm) hp2
           }
-        · intro hx
+        · intro hp
           rw[Set.mem_preimage]
-          obtain ⟨x', hx'⟩ := Quotient.exists_rep x
-          rw[← hx']
-          induction x'
-          case inl y => {
+          obtain ⟨p', hp'⟩ := Quotient.exists_rep p
+          rw[← hp']
+          induction p'
+          case inl x => {
             simp[wedge_embedding, coprod_prod_map]
             left
-            exact mem_of_eq_of_mem hx' hx
+            exact mem_of_eq_of_mem hp' hp
           }
-          case inr z => {
+          case inr y => {
             simp[wedge_embedding, coprod_prod_map]
             right
-            exact mem_of_eq_of_mem hx' hx
+            exact mem_of_eq_of_mem hp' hp
           }
-  · have hcont : Continuous (wedge_embedding Y Z) := wedge_embedding_cont Y Z
+  · have hcont : Continuous (wedge_embedding X Y) := wedge_embedding_cont X Y
     intro hA
     rw[isOpen_induced_iff] at hA
     obtain ⟨B, hB1, hB2⟩ := hA
@@ -782,22 +791,22 @@ lemma wedge_embedding_inducing: Inducing (wedge_embedding Y Z) := by{
     assumption
 }
 
-lemma wedge_embedding_pointed: wedge_embedding Y Z default = default := by{
-  let _:= wedge_setoid Y Z
+lemma wedge_embedding_pointed: wedge_embedding X Y default = default := by{
+  let _:= wedge_setoid X Y
   simp[wedge_embedding]
-  have: (default: Y ⋁ Z) = Quotient.mk (wedge_setoid Y Z) (Sum.inl (default:Y)) := rfl
+  have: (default: X ⋁ Y) = Quotient.mk (wedge_setoid X Y) (Sum.inl (default:X)) := rfl
   rw[this]
   simp[Quotient.lift_mk, coprod_prod_map]
   rfl
 }
 
 
-theorem wedge_embeds_into_product: Embedding (wedge_embedding Y Z) := by{
-  let _hwedge := wedge_setoid Y Z
+theorem wedge_embeds_into_product: Embedding (wedge_embedding X Y) := by{
+  let _hwedge := wedge_setoid X Y
   rw[embedding_iff]
   constructor
   --induced topology
-  · exact wedge_embedding_inducing Y Z
+  · exact wedge_embedding_inducing X Y
 
   --injectivity
   · intro a b hab
@@ -805,18 +814,18 @@ theorem wedge_embeds_into_product: Embedding (wedge_embedding Y Z) := by{
     obtain ⟨a', ha'⟩ := Quotient.exists_rep a
     obtain ⟨b', hb'⟩:= Quotient.exists_rep b
     rw[← ha', ← hb'] at hab
-    have hab' : (coprod_prod_map Y Z) a' = (coprod_prod_map Y Z) b' := hab
+    have hab' : (coprod_prod_map X Y) a' = (coprod_prod_map X Y) b' := hab
     rw[← ha', ← hb']
     induction a'
-    case inl ya => {
+    case inl xa => {
       induction b'
-      case inl yb =>{
+      case inl xb =>{
         simp[coprod_prod_map] at hab'
         rw[hab']
       }
-      case inr zb =>{
+      case inr yb =>{
         simp[coprod_prod_map] at hab'
-        have : (wedge_setoid Y Z).r (Sum.inl ya) (Sum.inr zb) := by {
+        have : (wedge_setoid X Y).r (Sum.inl xa) (Sum.inr yb) := by {
           simp[quotient_setoid_equiv_iff]
           tauto
         }
@@ -824,18 +833,18 @@ theorem wedge_embeds_into_product: Embedding (wedge_embedding Y Z) := by{
         exact this
       }
     }
-    case inr za => {
+    case inr ya => {
       induction b'
-      case inl yb =>{
+      case inl xb =>{
         simp[coprod_prod_map] at hab'
         rw[Quotient.eq]
-        have: (wedge_setoid Y Z).r (Sum.inr za) (Sum.inl yb) := by {
+        have: (wedge_setoid X Y).r (Sum.inr ya) (Sum.inl xb) := by {
           simp[quotient_setoid_equiv_iff]
           tauto
         }
         exact this
       }
-      case inr zb =>{
+      case inr yb =>{
         simp[coprod_prod_map] at hab'
         rw[hab']
       }
@@ -843,25 +852,25 @@ theorem wedge_embeds_into_product: Embedding (wedge_embedding Y Z) := by{
 }
 
 --if something is in the image of the wedge embedding, then at least one of its coordinates is default
-lemma wedge_embedding_ran {x: Y × Z} (h: x ∈ range (wedge_embedding Y Z)) : x.1=default ∨ x.2=default := by{
-  let _:= wedge_setoid Y Z
+lemma wedge_embedding_ran {p: X × Y} (h: p ∈ range (wedge_embedding X Y)) : p.1=default ∨ p.2=default := by{
+  let _:= wedge_setoid X Y
   simp at h
   obtain ⟨t, ht⟩:= h
   obtain ⟨t', ht'⟩:= Quotient.exists_rep t
   induction t'
-  case inl y => {
+  case inl x => {
     right
     rw[← ht'] at ht
-    have : x = (y, default) := by {
+    have : p = (x, default) := by {
       rw[← ht]
       simp[wedge_embedding, coprod_prod_map]
     }
     simp[this]
   }
-  case inr z => {
+  case inr y => {
     left
     rw[← ht'] at ht
-    have : x = (default, z) := by{
+    have : p = (default, y) := by{
       rw[← ht]
       simp[wedge_embedding, coprod_prod_map]
     }
@@ -869,71 +878,81 @@ lemma wedge_embedding_ran {x: Y × Z} (h: x ∈ range (wedge_embedding Y Z)) : x
   }
 }
 
-lemma wedge_embedding_inl (y:Y) : wedge_embedding Y Z (wedge_inl Y Z y) = (y, default) := by{
-  let _:= wedge_setoid Y Z
+lemma wedge_embedding_inl (x:X) : wedge_embedding X Y (wedge_inl X Y x) = (x, default) := by{
+  let _:= wedge_setoid X Y
   simp[wedge_embedding, wedge_inl, coprod_prod_map]
 }
 
-lemma wedge_embedding_inr (z:Z) : wedge_embedding Y Z (wedge_inr Y Z z) = (default, z) := by{
-  let _:= wedge_setoid Y Z
+lemma wedge_embedding_inr (y:Y) : wedge_embedding X Y (wedge_inr X Y y) = (default, y) := by{
+  let _:= wedge_setoid X Y
   simp[wedge_embedding, wedge_inr, coprod_prod_map]
 }
 
 -- define smash products
-def smashsetoid : Setoid (Y × Z) := by{
-  let A : Set (Y × Z) := wedge_embedding Y Z '' univ
+def smashsetoid : Setoid (X × Y) := by{
+  let A : Set (X × Y) := wedge_embedding X Y '' univ
   exact quotient_setoid A
 }
 
-def Smash := Quotient (smashsetoid Y Z)
-instance: TopologicalSpace (Smash Y Z) := by exact instTopologicalSpaceQuotient
-instance: Inhabited (Smash Y Z) where
-  default:= Quotient.mk (smashsetoid Y Z) (default, default)
+def Smash := Quotient (smashsetoid X Y)
+
+/-NOTE: None of the smash definition requires topological spaces, and Lean recognizes this:
+it correctly identifies the smash products of any two inhabited types
+Ideally, this construction should simply be part of the category of pointed types.
+So there should be something like Pointed.smash that takes two pointed types (as in Mathlib/CategoryTheory/Category/Pointed)
+and gives back their smash products.
+This way, I can define the currying and uncurrying functions at the level of pointed sets
+then do what I want to do for (locally compact when needed) topological spaces
+-/
+
+instance: TopologicalSpace (Smash X Y) := by exact instTopologicalSpaceQuotient
+instance: Inhabited (Smash X Y) where
+  default:= Quotient.mk (smashsetoid X Y) (default, default)
 
 infix:50 " ⋀  " => Smash
 
-variable {Y Z} in
-def smash_elt (y:Y) (z:Z) : Y ⋀ Z := Quotient.mk (smashsetoid Y Z) (y,z)
+variable {X Y} in
+def smash_elt (y:X) (z:Y) : X ⋀ Y := Quotient.mk (smashsetoid X Y) (y,z)
 
 infix:50 " ∧' " => smash_elt
 
 
-variable {Y Z} in
-lemma smash_elt_eq_iff (y y' :Y) (z z':Z) : (smash_elt y z = smash_elt y' z') ↔ ( (y=default ∨ z=default) ∧ (y'=default ∨ z'=default) )∨ ( (y,z) = (y', z') ) := by{
-  let _:= smashsetoid Y Z
-  let _:= wedge_setoid Y Z
+variable {X Y} in
+lemma smash_elt_eq_iff (x x' :X) (y y':Y) : (smash_elt x y = smash_elt x' y') ↔ ( (x=default ∨ y=default) ∧ (x'=default ∨ y'=default) )∨ ( (x,y) = (x', y') ) := by{
+  let _:= smashsetoid X Y
+  let _:= wedge_setoid X Y
   simp[smash_elt]
   constructor
   · intro h
-    have : (smashsetoid Y Z).r (y,z) (y', z') := by exact Quotient.eq'.mp h
+    have : (smashsetoid X Y).r (x,y) (x', y') := by exact Quotient.eq'.mp h
     simp[quotient_setoid_equiv_iff] at this
     obtain hc1|hc2 := this
     · left
       obtain ⟨h1, h2⟩:= hc1
-      have h1':= wedge_embedding_ran Y Z h1
-      have h2':= wedge_embedding_ran Y Z h2
+      have h1':= wedge_embedding_ran X Y h1
+      have h2':= wedge_embedding_ran X Y h2
       tauto
     · rw[hc2.1, hc2.2]
       tauto
   · intro h
-    have : (smashsetoid Y Z).r (y,z) (y', z') := by {
+    have : (smashsetoid X Y).r (x,y) (x', y') := by {
       obtain hc1|hc2:= h
       · simp[quotient_setoid_equiv_iff]
         left
         constructor
         · obtain hd1|hd2:= hc1.1
           · rw[hd1]
-            use wedge_inr Y Z z
+            use wedge_inr X Y y
             simp [wedge_embedding, wedge_inr, coprod_prod_map]
           · rw[hd2]
-            use wedge_inl Y Z y
+            use wedge_inl X Y x
             simp [wedge_embedding, wedge_inl, coprod_prod_map]
         · obtain hd1|hd2:= hc1.2
           · rw[hd1]
-            use wedge_inr Y Z z'
+            use wedge_inr X Y y'
             simp [wedge_embedding, wedge_inr, coprod_prod_map]
           · rw[hd2]
-            use wedge_inl Y Z y'
+            use wedge_inl X Y x'
             simp [wedge_embedding, wedge_inl, coprod_prod_map]
       · rw[hc2.1, hc2.2]
         exact Quotient.eq'.mp rfl
@@ -941,60 +960,93 @@ lemma smash_elt_eq_iff (y y' :Y) (z z':Z) : (smash_elt y z = smash_elt y' z') �
     exact Quotient.eq.mpr this
 }
 
-@[simp] theorem smash_defaults_left (y:Y) : (y ∧' (default:Z)) = default := by{
-  have : (default: Y ⋀ Z) = (default ∧' default) := rfl
+@[simp] theorem smash_defaults_left (x:X) : (x ∧' (default:Y)) = default := by{
+  have : (default: X ⋀ Y) = (default ∧' default) := rfl
   rw[this]
   simp[smash_elt_eq_iff]
 }
 
-@[simp] theorem smash_defaults_right (z:Z) : ((default:Y) ∧' z) = default := by{
-  have : (default: Y ⋀ Z) = (default ∧' default) := rfl
+@[simp] theorem smash_defaults_right (y:Y) : ((default:X) ∧' y) = default := by{
+  have : (default: X ⋀ Y) = (default ∧' default) := rfl
   rw[this]
   rw[smash_elt_eq_iff]
   left
   simp
 }
 
---show that there is a pointed isomorphism Y ⋀ Z ≃ₜ Z ⋀ Y
+namespace Pointed
 
-def prod_swap : Y × Z → Z × Y := fun (y,z) ↦ (z,y)
+-- Pointed is the thing I should extend to the category of pointed topological spaces
+-- I'm starting to define some constructions for pointed sets
 
-lemma prod_swap_cont: Continuous (prod_swap Y Z) := by {
+variable (α β: Pointed)
+
+instance : Inhabited α.X where
+  default:= α.point
+
+def smash : Pointed := ⟨α ⋀ β, (default: α ⋀ β)⟩
+
+variable {α β}
+variable {γ: Pointed}
+
+def smash_curry' (f: α ⋀ β → γ) : (α → (β → γ)) := fun a ↦ (fun b ↦ f (a ∧' b))
+
+def smash_curry (f: Pointed.Hom (Pointed.smash α β) γ) : Pointed.Hom α (⟨Pointed.Hom β γ, ⟨fun _ ↦ γ.point, by simp ⟩  ⟩) := sorry
+
+/- etc etc
+This should be done at some point -/
+
+end Pointed
+
+
+
+
+
+--show that there is a pointed isomorphism X ⋀ Y ≃ₜ Y ⋀ X
+/- The way I'm doing this might be problematic if this construction is of pointed types.
+I should define an equivalence that works for all pointed types
+then extend the equivalence to a homeomorphism for topological spaces
+I think this just requires some rearranging and can be done easily
+-/
+
+def prod_swap : X × Y → Y × X := fun (y,z) ↦ (z,y)
+
+lemma prod_swap_cont: Continuous (prod_swap X Y) := by {
   simp[prod_swap]
   constructor
   · continuity
   · continuity
 }
 
-lemma prod_swap_wedge: (prod_swap Y Z) ∘ (wedge_embedding Y Z) = (wedge_embedding Z Y) ∘ (wedge_swap Y Z) := by{
-  let _:= wedge_setoid Y Z
-  let _:= wedge_setoid Z Y
+lemma prod_swap_wedge: (prod_swap X Y) ∘ (wedge_embedding X Y) = (wedge_embedding Y X) ∘ (wedge_swap X Y) := by{
+  let _:= wedge_setoid X Y
+  let _:= wedge_setoid Y X
   ext v
-  · obtain ⟨x, hx⟩ := Quotient.exists_rep v
-    rw[← hx]
-    induction x
-    case inl y => {
+  · obtain ⟨p, hp⟩ := Quotient.exists_rep v
+    rw[← hp]
+    induction p
+    case inl x => {
       simp[prod_swap, wedge_embedding, wedge_swap, Quotient.lift_mk, coprod_prod_map]
     }
-    case inr z => {
+    case inr y => {
       simp[prod_swap, wedge_embedding, wedge_swap, Quotient.lift_mk, coprod_prod_map]
     }
   --this is just a copy of the proof of the first goal
-  · obtain ⟨x, hx⟩ := Quotient.exists_rep v
-    rw[← hx]
-    induction x
-    case inl y => {
+  · obtain ⟨p, hp⟩ := Quotient.exists_rep v
+    rw[← hp]
+    induction p
+    case inl x => {
       simp[prod_swap, wedge_embedding, wedge_swap, Quotient.lift_mk, coprod_prod_map]
     }
-    case inr z => {
+    case inr y => {
       simp[prod_swap, wedge_embedding, wedge_swap, Quotient.lift_mk, coprod_prod_map]
     }
 }
 
-def smash_swap : Y ⋀ Z → Z ⋀ Y := by{
-  let _:= smashsetoid Y Z
-  let _:= smashsetoid Z Y
-  apply Quotient.lift ( (Quotient.mk (smashsetoid Z Y) )∘ (prod_swap Y Z))
+def smash_swap : X ⋀ Y → Y ⋀ X := by{
+  let _:= smashsetoid X Y
+  let _:= smashsetoid Y X
+  apply Quotient.lift ( (Quotient.mk (smashsetoid Y X) )∘ (prod_swap X Y))
   intro a b hab
   simp[smashsetoid, prod_swap, smash_elt_eq_iff]
   have hab': Setoid.r a b := hab
@@ -1009,12 +1061,12 @@ def smash_swap : Y ⋀ Z → Z ⋀ Y := by{
       simp
       constructor
       · use wedge_swap _ _ c
-        have : wedge_embedding Z Y (wedge_swap Y Z c) = ((wedge_embedding Z Y) ∘ (wedge_swap Y Z)) c := rfl
-        rw [this, ← prod_swap_wedge Y Z, Function.comp, hc]
+        have : wedge_embedding Y X (wedge_swap X Y c) = ((wedge_embedding Y X) ∘ (wedge_swap X Y)) c := rfl
+        rw [this, ← prod_swap_wedge X Y, Function.comp, hc]
         simp[prod_swap]
       · use wedge_swap _ _ d
-        have : wedge_embedding Z Y (wedge_swap Y Z d) = ((wedge_embedding Z Y) ∘  (wedge_swap Y Z)) d := rfl
-        rw [this, ← prod_swap_wedge Y Z, Function.comp, hd]
+        have : wedge_embedding Y X (wedge_swap X Y d) = ((wedge_embedding Y X) ∘  (wedge_swap X Y)) d := rfl
+        rw [this, ← prod_swap_wedge X Y, Function.comp, hd]
         simp[prod_swap]
     · right
       rw[hc2]
@@ -1022,102 +1074,102 @@ def smash_swap : Y ⋀ Z → Z ⋀ Y := by{
   exact Quotient.eq.mpr this
 }
 
-lemma continuous_smash_swap: Continuous (smash_swap Y Z) := by{
+lemma continuous_smash_swap: Continuous (smash_swap X Y) := by{
   apply Continuous.quotient_lift
   apply Continuous.comp
   · apply continuous_quot_mk
-  · exact prod_swap_cont Y Z
+  · exact prod_swap_cont X Y
 }
 
-variable{Y Z} in
-lemma swap_pair (y:Y) (z:Z) : smash_swap Y Z (y ∧' z) = (z ∧' y) := by {
-  let _:= smashsetoid Y Z
-  let _:= smashsetoid Z Y
+variable{X Y} in
+@[simp] lemma swap_pair (x:X) (y:Y) : smash_swap X Y (x ∧' y) = (y ∧' x) := by {
+  let _:= smashsetoid X Y
+  let _:= smashsetoid Y X
   simp[smash_swap, smash_elt, Quotient.lift_mk, prod_swap]
 }
 
-lemma pointed_smash_swap: (smash_swap Y Z) default = default := by{
-  have h1 : (default : Y ⋀ Z)  = (default ∧' default) := rfl
-  have h2 : (default : Z ⋀ Y)  = (default ∧' default) := rfl
+lemma pointed_smash_swap: (smash_swap X Y) default = default := by{
+  have h1 : (default : X ⋀ Y)  = (default ∧' default) := rfl
+  have h2 : (default : Y ⋀ X)  = (default ∧' default) := rfl
   rw[h1, h2, swap_pair]
 }
 
 
-variable {Y Z} in
-lemma swap_swap (x: Y ⋀ Z) : smash_swap Z Y (smash_swap Y Z x) = x := by{
-  obtain ⟨v, hv⟩:= Quotient.exists_rep x
-  have : x = ((v.1) ∧' (v.2)) := by {
+variable {X Y} in
+lemma swap_swap (p: X ⋀ Y) : smash_swap Y X (smash_swap X Y p) = p := by{
+  obtain ⟨v, hv⟩:= Quotient.exists_rep p
+  have : p = ((v.1) ∧' (v.2)) := by {
     simp[hv, smash_elt]
   }
   rw[this]
   simp[swap_pair]
 }
 
-def homeo_smash_swap: Y ⋀ Z ≃ₜ⋆ Z ⋀ Y where
-  toFun := smash_swap Y Z
-  continuous_toFun := continuous_smash_swap Y Z
-  invFun := smash_swap Z Y
-  continuous_invFun := continuous_smash_swap Z Y
+def homeo_smash_swap: X ⋀ Y ≃ₜ⋆ Y ⋀ X where
+  toFun := smash_swap X Y
+  continuous_toFun := continuous_smash_swap X Y
+  invFun := smash_swap Y X
+  continuous_invFun := continuous_smash_swap Y X
 
   left_inv := by{
     rw[LeftInverse]
-    intro x
-    exact swap_swap x
+    intro p
+    exact swap_swap p
   }
   right_inv := by{
     rw[Function.RightInverse, LeftInverse]
-    intro x
-    exact swap_swap x
+    intro p
+    exact swap_swap p
   }
 
-  pointed_toFun := pointed_smash_swap Y Z
+  pointed_toFun := pointed_smash_swap X Y
 
 
 
---Show that Y ≃ₜ⋆  W → Y ⋀ Z ≃ₜ⋆  W ⋀ Z
-variable (W:Type*) [TopologicalSpace W] [Inhabited W]
+--Show that X ≃ₜ⋆  Z → X ⋀ Y ≃ₜ⋆  Z ⋀ Y
+variable (Z:Type*) [TopologicalSpace Z] [Inhabited Z]
 variable (W':Type*) [TopologicalSpace W'] [Inhabited W']
 
 section smashmaps
-variable {Y Z W W'}
+variable {X Y Z W'}
 
 
-def prod_maps (f: Y → W) (g: Z → W') : Y × Z → W × W' := fun (y, z) ↦ (f y, g z)
+def prod_maps (f: X → Z) (g: Y → W') : X × Y → Z × W' := fun (y, z) ↦ (f y, g z)
 
-variable {f: Y → W}
-variable {g: Z → W'}
+variable {f: X → Z}
+variable {g: Y → W'}
 variable (hf: f default = default)
 variable (hg: g default = default)
 
 
-def smash_maps : Y ⋀ Z → W ⋀ W' := by {
-  let _:= smashsetoid Y Z
-  let _:= smashsetoid W W'
-  apply Quotient.lift ( (Quotient.mk (smashsetoid W W') )∘ (prod_maps f g))
+def smash_maps : X ⋀ Y → Z ⋀ W' := by {
+  let _:= smashsetoid X Y
+  let _:= smashsetoid Z W'
+  apply Quotient.lift ( (Quotient.mk (smashsetoid Z W') )∘ (prod_maps f g))
   intro a b hab
   simp[prod_maps]
   have: Setoid.r a b := hab
   simp[quotient_setoid_equiv_iff] at this
   obtain hc1| hc2 := this
   · obtain ⟨ha, hb⟩:= hc1
-    have ha' : a.1 = default ∨ a.2 = default := wedge_embedding_ran Y Z ha
-    have hb' : b.1 = default ∨ b.2 = default := wedge_embedding_ran Y Z hb
+    have ha' : a.1 = default ∨ a.2 = default := wedge_embedding_ran X Y ha
+    have hb' : b.1 = default ∨ b.2 = default := wedge_embedding_ran X Y hb
     have : Setoid.r (f a.1, g a.2) (f b.1, g b.2) := by{
       simp[quotient_setoid_equiv_iff]
       left
       constructor
       · obtain hal|har := ha'
-        · use wedge_inr W W' (g a.2)
+        · use wedge_inr Z W' (g a.2)
           rw[hal, hf]
           apply wedge_embedding_inr
-        · use wedge_inl W W' (f a.1)
+        · use wedge_inl Z W' (f a.1)
           rw[har, hg]
           apply wedge_embedding_inl
       · obtain hbl|hbr := hb'
-        · use wedge_inr W W' (g b.2)
+        · use wedge_inr Z W' (g b.2)
           rw[hbl, hf]
           apply wedge_embedding_inr
-        · use wedge_inl W W' (f b.1)
+        · use wedge_inl Z W' (f b.1)
           rw[hbr, hg]
           apply wedge_embedding_inl
     }
@@ -1140,10 +1192,10 @@ lemma continuous_smash_maps (hf': Continuous f) (hg': Continuous g) : Continuous
 
 
 lemma pointed_smash_maps: (smash_maps hf hg) default = default := by{
-  let _:= smashsetoid Y Z
-  let _:= smashsetoid W W'
+  let _:= smashsetoid X Y
+  let _:= smashsetoid Z W'
   simp[smash_maps]
-  have : (default: Y ⋀ Z) = Quotient.mk (smashsetoid Y Z) (default, default) := rfl
+  have : (default: X ⋀ Y) = Quotient.mk (smashsetoid X Y) (default, default) := rfl
   rw[this, Quotient.lift_mk]
   simp[prod_maps, hf, hg]
   symm
@@ -1151,75 +1203,82 @@ lemma pointed_smash_maps: (smash_maps hf hg) default = default := by{
 }
 
 
-lemma smash_maps_comp {W₁ W₂: Type*} [TopologicalSpace W₁] [Inhabited W₁] [TopologicalSpace W₂] [Inhabited W₂] {f': W → W₁} {g': W' → W₂} (hf': f' default = default) (hg': g' default = default) (x: Y ⋀ Z) : smash_maps hf' hg' (smash_maps hf hg x) = @smash_maps _ _ _ _ _ _ _ _ (f' ∘ f) (g' ∘g) (by simp[hf, hf']) (by simp[hg, hg']) x := by{
-  let _:= smashsetoid Y Z
-  let _:= smashsetoid W W'
+lemma smash_maps_comp {W₁ W₂: Type*} [TopologicalSpace W₁] [Inhabited W₁] [TopologicalSpace W₂] [Inhabited W₂] {f': Z → W₁} {g': W' → W₂} (hf': f' default = default) (hg': g' default = default) (p: X ⋀ Y) : smash_maps hf' hg' (smash_maps hf hg p) = @smash_maps _ _ _ _ _ _ _ _ (f' ∘ f) (g' ∘g) (by simp[hf, hf']) (by simp[hg, hg']) p := by{
+  let _:= smashsetoid X Y
+  let _:= smashsetoid Z W'
   let _:= smashsetoid W₁ W₂
   simp[smash_maps]
-  obtain ⟨x', hx'⟩:= Quotient.exists_rep x
-  rw[←hx']
+  obtain ⟨p', hp'⟩:= Quotient.exists_rep p
+  rw[←hp']
   simp[Quotient.lift_mk]
   simp[prod_maps]
 }
 
 end smashmaps
 
-variable (k: Y ≃ₜ⋆ W)
+variable (k: X ≃ₜ⋆ Z)
 
-variable{Y W} in
-def wedge_compare : Y ⋀ Z → W ⋀ Z := by {
+variable{X Z} in
+def wedge_compare : X ⋀ Y → Z ⋀ Y := by {
   apply @smash_maps _ _ _ _ _ _ _ _ k.toFun id
   · exact k.pointed_toFun
   · simp
 }
 
-variable{Y W} in
-lemma continuous_wedge_compare : Continuous (wedge_compare Z k) := by{
+variable{X Z} in
+lemma continuous_wedge_compare : Continuous (wedge_compare Y k) := by{
   rw[wedge_compare]
   apply continuous_smash_maps
   · exact k.continuous_toFun
   · exact continuous_id
 }
 
-variable{Y W} in
-lemma pointed_wedge_compare : (wedge_compare Z k) default = default := by {
+variable{X Z} in
+lemma pointed_wedge_compare : (wedge_compare Y k) default = default := by {
   simp[wedge_compare]
   apply pointed_smash_maps
 }
 
-
-def homeo_wedge_compare : Y ⋀ Z ≃ₜ⋆ W ⋀ Z where
-  toFun := wedge_compare Z k
-  continuous_toFun := continuous_wedge_compare Z k
-  invFun := wedge_compare Z (PointedHomeo.symm k)
-  continuous_invFun := continuous_wedge_compare Z (PointedHomeo.symm k)
+variable{X Z} in
+/--The pointed homeomorphism from X ⋀ Y to Z ⋀ Y obtained via a pointed homeomorphism from X to Z-/
+def homeo_wedge_compare : X ⋀ Y ≃ₜ⋆ Z ⋀ Y where
+  toFun := wedge_compare Y k
+  continuous_toFun := continuous_wedge_compare Y k
+  invFun := wedge_compare Y (PointedHomeo.symm k)
+  continuous_invFun := continuous_wedge_compare Y (PointedHomeo.symm k)
 
   left_inv := by{
-    let _:=smashsetoid Y Z
-    let _:= smashsetoid W Z
+    let _:=smashsetoid X Y
+    let _:= smashsetoid Z Y
     simp[LeftInverse]
-    intro x
+    intro p
     simp[wedge_compare]
     simp [smash_maps_comp, PointedHomeo.symm, smash_maps]
-    obtain ⟨x', hx'⟩:= Quotient.exists_rep x
-    rw[← hx']
+    obtain ⟨p', hp'⟩:= Quotient.exists_rep p
+    rw[← hp']
     simp[Quotient.lift_mk, prod_maps]
   }
   right_inv := by{
-    let _:=smashsetoid Y Z
-    let _:= smashsetoid W Z
+    let _:=smashsetoid X Y
+    let _:= smashsetoid Z Y
     simp[Function.RightInverse, LeftInverse]
-    intro x
+    intro p
     simp[wedge_compare]
     simp [smash_maps_comp, PointedHomeo.symm, smash_maps]
-    obtain ⟨x', hx'⟩:= Quotient.exists_rep x
-    rw[← hx']
+    obtain ⟨p', hp'⟩:= Quotient.exists_rep p
+    rw[← hp']
     simp[Quotient.lift_mk, prod_maps]
   }
 
-  pointed_toFun := pointed_wedge_compare Z k
+  pointed_toFun := pointed_wedge_compare Y k
 
+#check homeo_wedge_compare Y k
 
+#check PointedHomeo.trans
+
+variable{X Z} in
+/--The pointed homeomorphism from Y ⋀ X to Y ⋀ Z obtained via a pointed homeomorphism from X to Z-/
+def homeo_wedge_compare': Y ⋀ X ≃ₜ⋆ Y ⋀ Z := PointedHomeo.trans (PointedHomeo.trans (homeo_smash_swap Y X) (homeo_wedge_compare Y k)) (homeo_smash_swap Z Y)
 
 --define the spheres Sⁿ
 
@@ -1296,6 +1355,7 @@ lemma wrap_eq_iff (a b : I): wrap a = wrap b ↔ (a = 0 ∨ a = 1) ∧ (b = 0 �
         constructor
         · sorry
         · sorry
+      · norm_num
     · rw[hc2, Real.cos_sub] at h2
       have hsin: Real.sin (2 * Real.pi * a) = 0 := by sorry
       have hcos: Real.cos ((2*k + 1) * Real.pi) = -1 := by sorry
@@ -1334,12 +1394,15 @@ lemma continuous_wrap: Continuous wrap := by {
   simp[wrap]
   refine Continuous.subtype_mk ?h fun x ↦ wrap.proof_2 x
 
+
+
   have: ∀ i : Fin (1+1), Continuous fun t ↦ ↑↑i * Real.sin (2 * Real.pi * ↑t) + (1 - ↑↑i) * Real.cos (2 * Real.pi * ↑t) := by {
     intro i
     continuity
   }
 
-  sorry --shouldn't this be a lemma from the library?
+
+  sorry --shouldn't this be a lemma from the library? by discreteness of Fin n
 }
 
 
@@ -1431,38 +1494,62 @@ def wrap_quot_homeo: J ≃ₜ circle := by{
   apply Continuous.homeoOfEquivCompactToT2 continuous_wrap_quot_equiv
 }
 
+
 lemma pointed_wrap_quot : wrap_quot_equiv default = default := by{
   let _:= I_quotient
   simp[wrap_quot_equiv, wrap_quot]
   have : (default : J) = Quotient.mk I_quotient 0 := rfl
   rw[this]
   rw[Quotient.lift_mk]
-
-  simp[wrap, default]
-  --shouldn't this now be rfl?
-  sorry
+  simp[wrap, default, EuclideanSpace.single]
+  funext t
+  simp
+  split_ifs with h
+  · rw[h]
+    norm_num
+  · have : t=1 := by {
+    have htlt : t.val < 1 + 1 := t.isLt
+    have : t.val < 2 := by exact htlt
+    have ht : t.val = 0 ∨ t.val = 1 := by{
+      refine Nat.le_one_iff_eq_zero_or_eq_one.mp ?_
+      exact Nat.lt_succ.mp this
+    }
+    ext
+    have : t.val ≠ 0 := by {
+      by_contra hcontr
+      have : 0= (@OfNat.ofNat (Fin (1 + 1)) 0 Zero.toOfNat0).val := rfl
+      rw[this] at hcontr
+      have := Fin.eq_of_val_eq hcontr
+      exact h this
+    }
+    tauto
+  }
+    rw[this]
+    norm_num
 }
+
+def wrap_quot_pointed_homeo: J ≃ₜ⋆ circle where
+  toHomeomorph:= wrap_quot_homeo
+  pointed_toFun := pointed_wrap_quot
 
 #check EuclideanSpace.single
 
--- Now, this will allow me to say that by a previous lemma Y ⋀ S¹ ≃ₜ Y ⋀ J
-lemma smash_circle_J_equiv : Y ⋀ (𝕊 1) ≃ₜ Y ⋀ J := by sorry
+
+/-- A pointed homeomorphism between X ⋀ 𝕊¹ and X ⋀ [0,1]/∼, where the equivalence relation quotients out the extremes. -/
+def smash_circle_J_pointed_homeo : X ⋀ (𝕊 1) ≃ₜ⋆ X ⋀ J := PointedHomeo.symm (homeo_wedge_compare' X (wrap_quot_pointed_homeo))
 
 
-lemma pointed_smash_circle_J_equiv : smash_circle_J_equiv Y default = default := by sorry
+-- Now I can show that X ⋀ J ≃ₜ Σ₀ X
 
+def prod_to_wedge : (X × I) → (X ⋀ J) := fun (y, t) ↦ smash_elt y (Quotient.mk I_quotient t)
 
--- Now I can show that Y ⋀ J ≃ₜ Σ₀ Y
+lemma continuous_prod_to_wedge: Continuous (prod_to_wedge X) := by sorry
 
-def prod_to_wedge : (Y × I) → (Y ⋀ J) := fun (y, t) ↦ smash_elt y (Quotient.mk I_quotient t)
-
-lemma continuous_prod_to_wedge: Continuous (prod_to_wedge Y) := by sorry
-
-def sus_to_wedge : Σ₀ Y → (Y ⋀ J) := by{
-  let _:= basedsuspension_setoid Y
-  apply Quotient.lift (prod_to_wedge Y)
+def sus_to_wedge : Σ₀ X → (X ⋀ J) := by{
+  let _:= basedsuspension_setoid X
+  apply Quotient.lift (prod_to_wedge X)
   intro a b hab
-  have : (basedsuspension_setoid Y).r a b := hab
+  have : (basedsuspension_setoid X).r a b := hab
   simp[quotient_setoid_equiv_iff] at this
   simp[prod_to_wedge, smash_elt_eq_iff]
 
@@ -1475,24 +1562,24 @@ def sus_to_wedge : Σ₀ Y → (Y ⋀ J) := by{
     sorry
 }
 
-lemma continuous_sus_to_wedge : Continuous (sus_to_wedge Y) := by{
+lemma continuous_sus_to_wedge : Continuous (sus_to_wedge X) := by{
   apply Continuous.quotient_lift
-  exact continuous_prod_to_wedge Y
+  exact continuous_prod_to_wedge X
 }
 
 -- Pointed etc
 
 
 --Finally, compose to get
---[ TODO ] show Y ⋀ S¹ ≃ₜ⋆  Σ₀ Y (Hatcher page 12)
+--[ TODO ] show X ⋀ S¹ ≃ₜ⋆  Σ₀ X
 
 
 
 
---[ TODO ] adjunction Top_* (Y ⋀ Z, W) ≃ Top_* (Y, Top_* (Z,W)) for Z locally compact
+--[ TODO ] adjunction Top_* (X ⋀ Y, Z) ≃ Top_* (X, Top_* (Y,Z)) for Y locally compact
 section adjunction
 /-
-Ideally, this should be a categorical statement: the functor Hom(Z,-) is right adjoint to -⋀ Z
+Ideally, this should be a categorical statement: the functor Hom(Y,-) is right adjoint to -⋀ Y
 in pointed topological spaces. I haven't framed pointed spaces as a category, see eg
     mathlib4/Mathlib/CategoryTheory/Category/Pointed.lean
 for general pointed types.
@@ -1502,19 +1589,19 @@ I think the bulk of the proof is what I'm doing now and it can all be polished u
 /-The unpointed version of the map we want is already in Mathlib as ContinuousMap.curry
   This is why ours will be called PointedMap.curry -/
 
-variable [LocallyCompactSpace Z]
-instance : TopologicalSpace C⋆(Z,W) := PointedMap.compactOpen Z W
-instance : Inhabited C⋆(Z,W) where
-  default := PointedMap.trivial Z W
+variable [LocallyCompactSpace Y]
+instance : TopologicalSpace C⋆(Y,Z) := PointedMap.compactOpen Y Z
+instance : Inhabited C⋆(Y,Z) where
+  default := PointedMap.trivial Y Z
 
 
 namespace PointedMap
-variable {Y Z W}
+variable {X Y Z}
 /- Much of the following (up to end PointedMap) is adapted from mathlib4/Mathlib/Topology/CompactOpen.lean by Reid Barton, starting on line 364 -/
 
 /-- Auxiliary definition, see `PointedMap.curry`. -/
-def curry' (f : C⋆(Y ⋀ Z, W)) (y : Y) : C⋆(Z, W) where
-  toFun := Function.curry (f ∘ Quotient.mk (smashsetoid Y Z)) y
+def curry' (f : C⋆(X ⋀ Y, Z)) (y : X) : C⋆(Y, Z) where
+  toFun := Function.curry (f ∘ Quotient.mk (smashsetoid X Y)) y
   continuous_toFun := by {
     apply Continuous.comp
     · apply Continuous.comp
@@ -1524,12 +1611,12 @@ def curry' (f : C⋆(Y ⋀ Z, W)) (y : Y) : C⋆(Z, W) where
   }
   pointed_toFun := by{
     simp
-    have : Quotient.mk (smashsetoid Y Z) (y, default) = ( y ∧' default) := rfl
+    have : Quotient.mk (smashsetoid X Y) (y, default) = ( y ∧' default) := rfl
     simp[this]
   }
 
   /-- If a map `X ⋀ Y → Z` is continuous, then its curried form `X → C⋆(Y, Z)` is continuous. -/
-theorem continuous_curry' (f : C⋆(Y ⋀ Z, W)) : Continuous (curry' f) := by{
+theorem continuous_curry' (f : C⋆(X ⋀ Y, Z)) : Continuous (curry' f) := by{
   --apply Continuous.comp
   sorry
 }
@@ -1538,66 +1625,120 @@ theorem continuous_curry' (f : C⋆(Y ⋀ Z, W)) : Continuous (curry' f) := by{
 
 --Continuous.comp (continuous_comp f) continuous_coev
 
-theorem pointed_curry' (f : C⋆(Y ⋀ Z, W)) : (curry' f) default = default := by{
-  simp[curry']
+  /-- If a map `X ⋀ Y → Z` is pointed, then its curried form `X → C⋆(Y, Z)` is pointed. -/
+theorem pointed_curry' (f : C⋆(X ⋀ Y, Z)) : (curry' f) default = default := by{
+  simp[curry', Function.curry]
   ext z
+  simp[default, PointedMap.trivial]
   -- Don't I have a simp lemma that simplifies this further??? Shouldn't this be just simp now?
   sorry
 }
 
--- [TO FIX] Variables are a mess now. Documentation strings have the correct one, and code lines have one shifted. Exercise caution.
-
 /-- The curried form of a pointed continuous map `X ⋀ Y → Z` as a pointed continuous map `X → C⋆(Y, Z)`.
     If `Y` is locally compact, this is a bijection and carries an adjunction of functors `- ⋀ Y  ⊣ C⋆(Y, -)` . -/
-def curry (f : C⋆(Y ⋀ Z, W)) : C⋆(Y, C⋆(Z, W)) where
+def curry (f : C⋆(X ⋀ Y, Z)) : C⋆(X, C⋆(Y, Z)) where
   continuous_toFun:= continuous_curry' f
   pointed_toFun:= pointed_curry' f
 
 @[simp]
-theorem curry_apply (f : C⋆(Y ⋀ Z, W)) (y : Y) (z : Z) : f.curry y z = f (y ∧'z) :=
+theorem curry_apply (f : C⋆(X ⋀ Y, Z)) (y : X) (z : Y) : f.curry y z = f (y ∧'z) :=
   rfl
 
+
+def toFun_toFun (f:C⋆(X, C⋆(Y, Z))) : X → (Y → Z) := fun y ↦ (fun z ↦ (f y) z)
+
+-- I think much of this can happen at the level of pointed types with no mention of the topology. Should I do it there and extend?
+/-- The uncurrying of a pointed function X → (Y → Z)  to a function X ⋀ Y → Z. This is not the same as Function.uncurry, which maps to X × Y → Z -/
+def uncurry' (f:C⋆(X, C⋆(Y, Z))) : X ⋀ Y → Z := by {
+  let _:= smashsetoid X Y
+  apply Quotient.lift (Function.uncurry f.toFun_toFun)
+  -- from now on, semi-identical proofs of this kind have occured many times, perhaps it should be automated a bit
+  intro a b hab
+  have hab' : Setoid.r a b := hab
+  simp[quotient_setoid_equiv_iff] at hab'
+  obtain hc1|hc2 := hab'
+  · simp[Function.uncurry, toFun_toFun]
+    obtain ⟨h1, h2⟩:= hc1
+    have h1' := wedge_embedding_ran _ _ h1
+    have h2' := wedge_embedding_ran _ _ h2
+    have h1'' : (f.toContinuousMap a.1).toContinuousMap a.2 = default := by{
+      obtain hl|hr := h1'
+      · simp[hl]
+        -- I feel like the simps for pointed maps are too weak against their extension from continuous maps!
+        --simp[f.pointed_toFun]
+        sorry
+      · simp[hr, (f a.1).pointed_toFun]
+        sorry
+    }
+    have h2'' : (f.toContinuousMap b.1).toContinuousMap b.2 = default := by{
+      -- copy proof for h1''
+      sorry
+    }
+    rw[h1'', h2'']
+  · rw[hc2]
+}
+
+
+
+
+/-- The uncurried form of a continuous map `X → C⋆(Y, Z)` for `Y` locally compact is a continuous map `X ⋀ Y → Z`. -/
+theorem continuous_uncurry_of_continuous [LocallyCompactSpace Y] (f:C⋆(X, C⋆(Y, Z))) : Continuous (f.uncurry') := by{
+  simp[uncurry']
+  apply Continuous.quotient_lift
+  simp[toFun_toFun]
+  apply ContinuousMap.continuous_uncurry_of_continuous  --why is it failing so badly???
+
+
+  -- Again, if simp was powerful enough, this should be simpler to deal with
+  --apply ContinuousMap.continuous_uncurry_of_continuous (ContinuousMap.uncurry f.toFun_toFun)
+  -- gets stuck into bad coercions
+
+
+}
+
+#check ContinuousMap.continuous_uncurry_of_continuous
 
 
 /- ORIGINAL FILE FOR Continuous.curry: NOT MY CODE!!!
 
 
+PLEASE COPY AGAIN BEFORE USING -- I FOUND AND REPLACED Y->X AND Z->Y AND NOW THIS IS SUPER MESSED UP
+
+-- my maps here will have to be forced to be pointed by assumption but it's fine I guess
 /-- To show continuity of a map `X → C(Y, Z)`, it suffices to show that its uncurried form
-    `X × Y → Z` is continuous. -/
-theorem continuous_of_continuous_uncurry (f : X → C(Y, Z))
+    `X × X → Y` is continuous. -/
+theorem continuous_of_continuous_uncurry (f : X → C(X, Y))
     (h : Continuous (Function.uncurry fun x y => f x y)) : Continuous f :=
   continuous_curry' ⟨_, h⟩
 
 
 
-
-
 /-- The currying process is a continuous map between function spaces. -/
-theorem continuous_curry [LocallyCompactSpace (X × Y)] :
-    Continuous (curry : C(X × Y, Z) → C(X, C(Y, Z))) := by
+theorem continuous_curry [LocallyCompactSpace (X × X)] :
+    Continuous (curry : C(X × X, Y) → C(X, C(X, Y))) := by
   apply continuous_of_continuous_uncurry
   apply continuous_of_continuous_uncurry
   rw [← (Homeomorph.prodAssoc _ _ _).symm.comp_continuous_iff']
   exact continuous_eval
 
 
-/-- The uncurried form of a continuous map `X → C(Y, Z)` is a continuous map `X × Y → Z`. -/
-theorem continuous_uncurry_of_continuous [LocallyCompactSpace Y] (f : C(X, C(Y, Z))) :
+/-- The uncurried form of a continuous map `X → C(X, Y)` is a continuous map `X × X → Y`. -/
+theorem continuous_uncurry_of_continuous [LocallyCompactSpace X] (f : C(X, C(X, Y))) :
     Continuous (Function.uncurry fun x y => f x y) :=
   continuous_eval.comp <| f.continuous.prod_map continuous_id
 
 
-/-- The uncurried form of a continuous map `X → C(Y, Z)` as a continuous map `X × Y → Z` (if `Y` is
+/-- The uncurried form of a continuous map `X → C(X, Y)` as a continuous map `X × X → Y` (if `X` is
     locally compact). If `X` is also locally compact, then this is a homeomorphism between the two
     function spaces, see `Homeomorph.curry`. -/
 @[simps]
-def uncurry [LocallyCompactSpace Y] (f : C(X, C(Y, Z))) : C(X × Y, Z) :=
+def uncurry [LocallyCompactSpace X] (f : C(X, C(X, Y))) : C(X × X, Y) :=
   ⟨_, continuous_uncurry_of_continuous f⟩
 
 
 /-- The uncurrying process is a continuous map between function spaces. -/
-theorem continuous_uncurry [LocallyCompactSpace X] [LocallyCompactSpace Y] :
-    Continuous (uncurry : C(X, C(Y, Z)) → C(X × Y, Z)) := by
+theorem continuous_uncurry [LocallyCompactSpace X] [LocallyCompactSpace X] :
+    Continuous (uncurry : C(X, C(X, Y)) → C(X × X, Y)) := by
   apply continuous_of_continuous_uncurry
   rw [← (Homeomorph.prodAssoc _ _ _).comp_continuous_iff']
   apply continuous_eval.comp (continuous_eval.prod_map continuous_id)
@@ -1610,14 +1751,42 @@ theorem continuous_uncurry [LocallyCompactSpace X] [LocallyCompactSpace Y] :
 
 
 
+-- Currying is an equivalence
+
+theorem injective_curry: Injective (curry : C⋆(X ⋀ Y, Z) → C⋆(X, C⋆(Y, Z))) := by{
+  simp[Injective]
+  intro f g hfg
+  ext x'
+  let ⟨x, hx⟩ := Quotient.exists_rep x'
+  have : x = (x.1, x.2) := rfl
+  have : x'= ((x.1) ∧' (x.2)) := by {rw[← hx, this]; rfl}
+  rw[this]
+  have hfg' : curry f x.1 x.2 = curry g x.1 x.2 := congrFun (congrArg FunLike.coe (congrFun (congrArg FunLike.coe hfg) x.1)) x.2
+  simp at hfg'
+  assumption
+}
+
+theorem surjective_curry: Surjective (curry : C⋆(X ⋀ Y, Z) → C⋆(X, C⋆(Y, Z))) := by{
+  simp[Surjective]
+  intro F
+  sorry
+}
 
 
--- [ TODO ] Currying is an equivalence
+def equiv_curry: C⋆(X ⋀ Y, Z) ≃ C⋆(X, C⋆(Y, Z)) := by{
+  apply Equiv.ofBijective (curry)
+  constructor
+  · exact injective_curry
+  · exact surjective_curry
+}
+
 
 
 -- [ TODO ] Naturality
 
 end PointedMap
+
+
 
 end adjunction
 
@@ -1625,16 +1794,17 @@ end adjunction
 
 
 
---prove that the free suspension of 𝕊ⁿ is homeomorphic to 𝕊^{n+1}
+-- [TODO] Prove that the free suspension of 𝕊ⁿ is homeomorphic to 𝕊^{n+1}
 
 lemma target_in_sphere (y : 𝕊 n) (t: I) : @norm (EuclideanSpace ℝ (Fin (n + 1))) SeminormedAddGroup.toNorm (Fin.snoc (fun i ↦ Real.sqrt (1 - (↑t+1)/2 * (↑t+1)/2) * (y.1 i) ) ((↑t +1)/2))  = 1 := by{
   simp[Fin.snoc, EuclideanSpace.norm_eq, Finset.sum_fin_eq_sum_range, Finset.sum_range_succ]
   sorry
+  -- I remember this working earlier (???)
 }
 
 
 def cyl_to_sphere: (𝕊 n) × I  → (𝕊 (n+1)) :=
-  fun (⟨x, p⟩, t) ↦ ⟨Fin.snoc ( fun i ↦ Real.sqrt (1-((↑t +1)/2)*((↑t +1)/2)) * (x i) ) ((↑t +1)/2) ,  by{simp; exact target_in_sphere n (⟨x, p⟩) t} ⟩
+  fun (⟨x, p⟩, t) ↦ ⟨Fin.snoc ( fun i ↦ Real.sqrt (1-((↑t +1)/2)*((↑t +1)/2)) * (x i) ) ((↑t +1)/2) ,  by{simp; /-exact target_in_sphere n (⟨x, p⟩) t}-/ sorry} ⟩
 
 
 def sus_to_sphere: S (𝕊 n) → 𝕊 (n+1) := by{
@@ -1686,7 +1856,7 @@ def sus_to_sphere_homeo: S (𝕊 n)  ≃ₜ (𝕊 (n+1))  := by{
 -- adjunction with loop (depending on difficulty, either the smash version or just the suspension version) [Doing the general version] [TODO compose the correct maps to get the special case]
 -- time permitting, more related and basic topological things that are missing [I don't think time permits]
 
-Some things about the mapping cone seem to be in Mathlib in abstract nonsense form (I should check more carefully), maybe define mapping cones and show they fit the nonsense?
+Some things about the mapping cone seem to be in Mathlib in abstract nonsense form (I should check more carefully), maxbe define mapping cones and show they fit the nonsense?
 -/
 
 
@@ -1696,5 +1866,6 @@ https://ncatlab.org/nlab/show/smash+product
 -/
 
 --#lint
+end pointed_spaces
 
 end
