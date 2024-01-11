@@ -1,4 +1,6 @@
 import LeanCourse.Common
+import Mathlib.CategoryTheory.ConcreteCategory.BundledHom
+import Mathlib.CategoryTheory.Elementwise
 open Topology TopologicalSpace Set Filter
 
 /-!
@@ -6,11 +8,14 @@ open Topology TopologicalSpace Set Filter
 # Warning: Derivative Content
 This file is an adaptation of some of the content of the existing Mathlib files for continuous functions and homeomorphisms, namely
 
-  mathlib4/Mathlib/Topology/ContinuousFunction/Basic.lean
+  Mathlib.Topology.ContinuousFunction.Basic
   by Nicolò Cavalleri
 
-  mathlib4/Mathlib/Topology/Homeomorph.lean
+  Mathlib.Topology.Homeomorph
   by Johannes Hölzl, Patrick Massot, Sébastien Gouëzel, Zhouhang Zhou, Reid Barton
+
+  Mathlib.Topology.Category.TopCat.Basic
+  by Patrick Massot, Scott Morrison, Mario Carneiro
 
 Further references are:
   https://leanprover-community.github.io/mathlib4_docs/Mathlib/Data/FunLike/Basic.html
@@ -30,18 +35,28 @@ We denote pointed homeomorphisms with the notation ` ≃ₜ⋆ `
 
 -/
 
-
-variable (X:Type*) [TopologicalSpace X] [Inhabited X]
-variable (Y:Type*) [TopologicalSpace Y] [Inhabited Y]
-
 /- Extending mathlib4/Mathlib/Topology/ContinuousFunction/Basic.lean -/
 
 
+class PointedTopSpace (X:Type*)
+  extends TopologicalSpace X where
+  default : X
+
+instance (X:Type*) [TopologicalSpace X] [Inhabited X] : PointedTopSpace X where
+  default := Inhabited.default
+
+instance (X:Type*) [PointedTopSpace X] : Inhabited X where
+  default := PointedTopSpace.default
+
+variable (X:Type*) (Y:Type*) (Z:Type*) [PointedTopSpace X] [PointedTopSpace Y] [PointedTopSpace Z]
+
+
 /--Pointed continuous functions between `X` and `Y`-/
-structure PointedMap
+structure PointedMap (X:Type*) (Y:Type*) [PointedTopSpace X] [PointedTopSpace Y]
     extends C(X, Y) where
   /-The underlying function maps the base point of the domain to the base point of the target-/
   pointed_toFun : toFun default = default := by simp
+
 
 
 /-ISSUE HERE:
@@ -103,12 +118,35 @@ protected def copy (f : PointedMap X Y) (f' : X → Y) (h : f' = ⇑f) : Pointed
     pointed_toFun := by simp[h]
   }
 
+@[simp] theorem apply (f: X →ₜ⋆ Y) (x: X ) : f.toContinuousMap x = f x := by rfl
 
-@[simp] theorem pointedmap_mk_coe (a : X →ₜ⋆ Y) (b) : (PointedMap.mk a b: X → Y) = a :=
+@[simp] theorem apply' (f: X→ₜ⋆ Y) : (ContinuousMap.toFun ∘ toContinuousMap) f = f := by rfl
+
+@[simp] theorem apply'' (f: X →ₜ⋆  Y) (x:X) : (ContinuousMap.toFun ∘ toContinuousMap) f x = f x := by rfl
+
+@[simp] theorem pointedmap_mk_coe (f : C(X,Y) ) (b) : (PointedMap.mk f b: X → Y) = f :=
   rfl
 
-@[simp] theorem pointedhomeo_mk_coe' (a : X →ₜ⋆ Y) (b c) : (PointedMap.mk (ContinuousMap.mk a b) c: X → Y) = a :=
+-- this should be what we wanted in the first place
+@[simp] theorem pointedmap_mk_coe' (a : X → Y) (b c) : (PointedMap.mk (ContinuousMap.mk a b) c: X → Y) = a :=
   rfl
+
+
+variable{X Y Z} in
+/-- Composition of two pointed maps. -/
+protected def comp (h₂ : Y →ₜ⋆  Z) (h₁ : X →ₜ⋆  Y) : X →ₜ⋆  Z where
+  continuous_toFun := h₂.continuous_toFun.comp h₁.continuous_toFun
+  pointed_toFun := by{
+    simp[h₁.pointed_toFun, h₂.pointed_toFun]
+    --have hyp1: (h₁.toContinuousMap: X → Y) default = default := h₁.pointed_toFun
+    --have hyp2: (h₂.toContinuousMap: Y → Z) default = default := h₂.pointed_toFun
+    --simp[hyp1, hyp2]
+  }
+
+@[simp]
+theorem comp_apply (h₁ : X →ₜ⋆  Y) (h₂ : Y →ₜ⋆  Z) (x : X) : h₂.comp h₁ x = h₂ (h₁ x) :=
+  rfl
+
 
 
 /--The subspace topology induced by the compact-open topology on the type of pointed continuous maps.-/
@@ -118,6 +156,12 @@ protected def compactOpen :TopologicalSpace (C⋆(X, Y)) := TopologicalSpace.ind
 protected def trivial : C⋆(X, Y) where
   toFun := fun _ ↦ default
 
+variable{X} in
+protected def id : C⋆(X, X) where
+  toFun := @id X
+
+
+@[simp] theorem id_apply (x:X) : id x = x := rfl
 
 
 -- [TODO] Adapt more of the original file
@@ -178,6 +222,13 @@ instance : CoeFun (X ≃ₜ⋆ Y) fun _ ↦ X → Y := ⟨FunLike.coe⟩
 
 
 @[ext] theorem ext {f g: X ≃ₜ⋆ Y} (h : ∀ x, f x = g x) : f = g := FunLike.ext f g h
+
+
+instance toPointedMap (f : PointedHomeo X Y) : PointedMap X Y where
+  toFun := f.toFun
+  continuous_toFun := f.continuous_toFun
+  pointed_toFun := f.pointed_toFun
+
 
 
 /-
@@ -384,15 +435,19 @@ protected theorem inducing (h : X ≃ₜ⋆ Y) : Inducing h :=
   inducing_of_inducing_compose h.continuous h.symm.continuous <| by
     simp only [symm_comp_self, inducing_id]
 
+/-
 theorem induced_eq (h : X ≃ₜ⋆  Y) : TopologicalSpace.induced h ‹_› = ‹_› :=
   h.inducing.1.symm
+-/
 
 protected theorem quotientMap (h : X ≃ₜ⋆ Y) : QuotientMap h :=
   QuotientMap.of_quotientMap_compose h.symm.continuous h.continuous <| by
     simp only [self_comp_symm, QuotientMap.id]
 
+/-
 theorem coinduced_eq (h : X ≃ₜ⋆ Y) : TopologicalSpace.coinduced h ‹_› = ‹_› :=
   h.quotientMap.2.symm
+-/
 
 protected theorem embedding (h : X ≃ₜ⋆  Y) : Embedding h :=
   ⟨h.inducing, h.injective⟩
@@ -417,10 +472,176 @@ end Embeddings
 -- I don't think I'm gonna need anything more from the main file (current line: 262)
 
 end PointedHomeo
+
+
+
+
+section PointedCategory
+
+open CategoryTheory TopologicalSpace
+universe u
+variable (X:Type*) [PointedTopSpace X]
+variable (Y:Type*) [PointedTopSpace Y]
+
+/--The category of pointed topological spaces and pointed continuous maps-/
+@[to_additive existing PointedTopCat]
+def PointedTopCat: Type (u+1) := Bundled PointedTopSpace
+
+#check (@PointedMap.toContinuousMap X Y _ _ _).toFun
+
+namespace PointedTopCat
+
+
+instance bundledHom : BundledHom @PointedMap where
+  toFun := fun _ _ ↦ ContinuousMap.toFun ∘ PointedMap.toContinuousMap
+  id := @PointedMap.id
+  comp := @PointedMap.comp
+  hom_ext := @PointedMap.toFun_injective
+  id_toFun := fun _ => rfl
+  comp_toFun := fun _ _ _ _ _ => rfl
+
+
+deriving instance LargeCategory for PointedTopCat
+
+instance concreteCategory : ConcreteCategory PointedTopCat := by
+  dsimp [PointedTopCat]
+  infer_instance
+
+
+--@[to_additive existing PointedTopCat.instCoeSortPointedTopCatType]
+instance instCoeSortTopCatType : CoeSort PointedTopCat (Type*) :=
+  Bundled.coeSort
+
+instance pointedtopologicalSpaceUnbundled (x : PointedTopCat) : PointedTopSpace x :=
+  x.str
+
+instance topspace_ofPointedTopCat (x: PointedTopCat) : TopologicalSpace x := by infer_instance
+
+instance inhabited_ofPointedTopCat (x:PointedTopCat) : Inhabited x := by infer_instance
+
+
+attribute [instance] ConcreteCategory.funLike in
+instance (X Y : PointedTopCat.{u}) : CoeFun (X ⟶ Y) fun _ => X → Y where
+  coe f := f
+
+@[simp] theorem id_app (X : PointedTopCat.{u}) (x : ↑X) : (𝟙 X : X ⟶ X) x = x := rfl
+
+@[simp] theorem id_app' (X: PointedTopCat.{u}) : 𝟙 X = @PointedMap.id X (pointedtopologicalSpaceUnbundled X) := rfl
+
+@[simp] theorem comp_app {X Y Z : PointedTopCat.{u}} (f : X ⟶ Y) (g : Y ⟶ Z) (x : X) :
+    (f ≫ g : X → Z) x = g (f x) := rfl
+
+@[simp] theorem comp_app'{X Y Z : PointedTopCat.{u}} (f : X ⟶ Y) (g : Y ⟶ Z) : f ≫ g = g ∘ f := rfl
+
+
+
+
+
+
+
+/-- Construct a bundled `PointedTop` from the underlying type and the typeclass. -/
+def of (X : Type u) [PointedTopSpace X] : PointedTopCat :=
+  ⟨X, inferInstance⟩
+
+instance topologicalSpace_coe (X : PointedTopCat) : PointedTopSpace X :=
+  X.str
+
+@[reducible]
+instance topologicalSpace_forget (X : PointedTopCat) : PointedTopSpace <| (forget PointedTopCat).obj X :=
+  X.str
+
+@[simp]
+theorem coe_of (X : Type u) [PointedTopSpace X] : (of X : Type u) = X := rfl
+
+
+def Point : PointedTopCat where
+  α := Fin 1
+
+
+instance inhabited : Inhabited PointedTopCat := ⟨Point⟩
+
+
+
+--@[simp] theorem coe_pointed_hom_comp {X Y Z: Type u} [PointedTopSpace X] [PointedTopSpace Y] [PointedTopSpace Z] (f:C⋆(X, Y)) (g:)
+
+
+
+lemma hom_apply {X Y : PointedTopCat} (f : X ⟶ Y) (x : X) : f x = (ContinuousMap.toFun ∘ PointedMap.toContinuousMap) f x := rfl
+
+
+-- I added this, I'm not sure it's needed and/or helpful
+@[simp] theorem coe_pointed_hom {X Y : Type u} [PointedTopSpace X] [PointedTopSpace Y] (f: C⋆(X,Y)) : X ⟶ Y := f
+
+
+
+@[simp] theorem coe_pointed_hom_apply {X Y : Type u} [PointedTopSpace X] [PointedTopSpace Y] (f: C⋆(X,Y)) (x:X) : coe_pointed_hom f x = f x := by{
+  --why not rfl??
+  -- rw[hom_apply (coe_pointed_hom f)] also does not work
+  sorry
+}
+
+
+
+@[ext] theorem ext (X Y : PointedTopCat) {f g: X ⟶ Y} (h : ∀ x, f x = g x) : f = g := FunLike.ext f g h
+
+
+@[simp] theorem pointedmap_mk_coe' {X Y Z : PointedTopCat.{u}}  (f : X ⟶ Y) (g : Y ⟶ Z) : (coe_pointed_hom (PointedMap.mk (ContinuousMap.mk f.toFun f.continuous_toFun) f.pointed_toFun)) ≫ coe_pointed_hom (PointedMap.mk (ContinuousMap.mk g g.continuous_toFun) g.pointed_toFun)  = g ∘ f := by {
+  -- note this relies on coe_pointed_hom_apply being in simp. At the moment, that one is broken
+  funext x
+  simp[coe_pointed_hom]
+  rfl
+}
+
+
+/-- Any pointed homeomorphism induces an isomorphism in `PointedTopCat`. -/
+@[simps]
+def isoOfPointedHomeo {X Y : PointedTopCat.{u}} (f : X ≃ₜ⋆  Y) : X ≅ Y where
+  hom := f.toPointedMap
+  inv := (f.symm).toPointedMap
+  hom_inv_id := by ext; exact f.symm_apply_apply _
+  inv_hom_id := by ext; exact f.apply_symm_apply _
+
+
+/-- Any isomorphism in `PointedTopCat` induces a pointed homeomorphism. -/
+@[simps]
+def pointedhomeoOfIso {X Y : PointedTopCat.{u}} (f : X ≅ Y) : X ≃ₜ⋆ Y where
+  toFun := f.hom
+  invFun := f.inv
+  left_inv x := by simp
+  right_inv x := by simp
+  continuous_toFun := f.hom.continuous
+  continuous_invFun := f.inv.continuous
+  pointed_toFun := f.hom.pointed_toFun
+
+
+@[simp]
+theorem of_isoOfPointedHomeo {X Y : PointedTopCat.{u}} (f : X ≃ₜ⋆ Y) : pointedhomeoOfIso (isoOfPointedHomeo f) = f := by
+  dsimp [pointedhomeoOfIso, isoOfPointedHomeo]
+  ext
+  rfl
+
+
+@[simp]
+theorem of_pointedhomeoOfIso {X Y : PointedTopCat.{u}} (f : X ≅ Y) : isoOfPointedHomeo (pointedhomeoOfIso f) = f := by
+  dsimp [pointedhomeoOfIso, isoOfPointedHomeo]
+  ext
+  rfl
+
+end PointedTopCat
+
+
+
+end PointedCategory
+
+
+
+
+
+
+
 /-
 Final comments:
 
-- [TODO] Declare some coercion from PointedHomeo to PointedMap
 - [TODO] Do I need more simp lemmas for PointedMap?
 - [TODO] Rephrase the embedding Y ⋁ Z → Y × Z in Suspension.lean in terms of the Embeddings section here
 
