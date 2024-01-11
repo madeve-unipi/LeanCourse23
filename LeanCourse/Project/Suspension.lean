@@ -1936,14 +1936,19 @@ namespace PointedMap
 variable {X Y Z}
 /- Much of the following (up to end PointedMap) is adapted from mathlib4/Mathlib/Topology/CompactOpen.lean by Reid Barton, starting on line 364 -/
 
+lemma continuous_function_curry' (f : C⋆(X ⋀ Y, Z)) : Continuous (f ∘ Quotient.mk (smashsetoid X Y)) := by {
+  apply Continuous.comp
+  · exact f.continuous_toFun
+  · exact continuous_quot_mk
+}
+
+
 /-- Auxiliary definition, see `PointedMap.curry`. -/
 def curry' (f : C⋆(X ⋀ Y, Z)) (y : X) : C⋆(Y, Z) where
   toFun := Function.curry (f ∘ Quotient.mk (smashsetoid X Y)) y
   continuous_toFun := by {
     apply Continuous.comp
-    · apply Continuous.comp
-      · exact map_continuous f
-      · exact continuous_quot_mk
+    · exact continuous_function_curry' f
     · exact Continuous.Prod.mk y
   }
   pointed_toFun := by{
@@ -1952,23 +1957,30 @@ def curry' (f : C⋆(X ⋀ Y, Z)) (y : X) : C⋆(Y, Z) where
     simp[this]
   }
 
+
   /-- If a map `X ⋀ Y → Z` is continuous, then its curried form `X → C⋆(Y, Z)` is continuous. -/
 theorem continuous_curry' (f : C⋆(X ⋀ Y, Z)) : Continuous (curry' f) := by{
-  --apply Continuous.comp
-  sorry
+  simp[curry']
+  have : Continuous (PointedMap.toContinuousMap  ∘ (curry' f)) := by {
+    have : toContinuousMap ∘ (curry' f) = ContinuousMap.curry' (ContinuousMap.mk (f ∘ Quotient.mk (smashsetoid X Y)) (continuous_function_curry' f)) := rfl
+    rw[this]
+    exact ContinuousMap.continuous_curry' (ContinuousMap.mk (↑f ∘ Quotient.mk (smashsetoid X Y)) (continuous_function_curry' f))
+  }
+
+  -- universal property of induced topology
+  exact continuous_induced_rng.mpr this
 }
 
 
-
---Continuous.comp (continuous_comp f) continuous_coev
-
   /-- If a map `X ⋀ Y → Z` is pointed, then its curried form `X → C⋆(Y, Z)` is pointed. -/
 theorem pointed_curry' (f : C⋆(X ⋀ Y, Z)) : (curry' f) default = default := by{
+  let _:= smashsetoid X Y
   simp[curry', Function.curry]
-  ext z
+  ext y
   simp[default, PointedMap.trivial]
-  -- Don't I have a simp lemma that simplifies this further??? Shouldn't this be just simp now?
-  sorry
+  have : Quotient.mk (smashsetoid X Y) ((default:X), y) = default := by apply smash_defaults_right
+  rw[this]
+  exact f.pointed_toFun
 }
 
 /-- The curried form of a pointed continuous map `X ⋀ Y → Z` as a pointed continuous map `X → C⋆(Y, Z)`.
@@ -2146,6 +2158,15 @@ end PointedMap
 end adjunction
 
 -- [ TODO? ] Do Proposition 1.3 in Cutler's pdf
+
+
+/- I think now the main goal is to show Σ₀ 𝕊ⁿ ≃ 𝕊^(n+1) so that one can ideally use the adjunction
+  for theorems about homotopy groups.
+  In particular, time permitting, a reasonable goal would be to prove
+  πₙ₊₁(X) ≃ πₙ(ΩX)
+  But the definition of homotopy groups in Mathlib is not even in terms of homotopy classes [S^n, X]⋆
+  so this might be hard to do now.
+-/
 
 
 
