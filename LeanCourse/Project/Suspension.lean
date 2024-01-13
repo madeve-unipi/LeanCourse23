@@ -31,10 +31,6 @@ Done:
 
 To do:
 - See comment at the end
-
-Things that should be polished:
-- Divide the content into sections, e.g. unpointed vs pointed. Specifically, also have the pointed spaces be X and X instead of X and Y
-- Deal with the implicit/explicit variable mess in the lemmas. Some are fine, some don't really need to be explicit
 -/
 
 
@@ -278,8 +274,8 @@ def SuspensionFunctor : CategoryTheory.Functor TopCat TopCat where
     rfl
   }
 
---[ TODO ] Define iterated suspensions
---[ TODO ] joins in general???
+--[ TODO? ] Define iterated suspensions
+--[ TODO? ] joins in general???
 
 
 end unpointed_spaces
@@ -435,12 +431,12 @@ def BasedSuspensionFunctor: Functor PointedTopCat PointedTopCat where
     exact basedmapsuspension_id X
   }
   map_comp := by{
-
-    simp
+    dsimp
     intro X Y Z f g
+    apply PointedTopCat.bundledHom.hom_ext
+    rw[BundledHom.toFun]
 
-    simp[BasedMapSuspension]
-    rw[PointedMap.pointedmap_mk_coe']
+    simp[BundledHom.toFun, BasedMapSuspension]
     funext x
 
 
@@ -452,7 +448,7 @@ def BasedSuspensionFunctor: Functor PointedTopCat PointedTopCat where
 
 
     --simp[basedmapsuspension_comp']
-    funext
+
     --simp
     sorry
   }
@@ -708,9 +704,9 @@ lemma pointed_wedge_inr: wedge_inr X Y default = default := by{
 
 /- To fix later-/
 def wedge_space : Functor PointedTopCat PointedTopCat where
-  obj:= fun X ↦ PointedTopCat.of (X ⋁ Y)
+  obj:= fun A ↦ PointedTopCat.of (A ⋁ Y)
   map := sorry
-  --map:= fun (f: X → Z) ↦ @wedge_induced X _ Y _ (Z ⋁ Y) _ _ ((wedge_inl Z Y) ∘ f) (wedge_inr Z Y) (by simp[f.pointed_toFun])
+  --map := fun (f: A ⟶ B) ↦ @wedge_induced A _ B _ (B ⋁ Y) _ _ ((wedge_inl Z B) ∘ f) (wedge_inr Z B) (by sorry) (by sorry)
   map_id := by{
     sorry
   }
@@ -1495,68 +1491,124 @@ def test2: EuclideanSpace ℝ (Fin 2) := fun n ↦ n
 def wrap : I → circle := fun t ↦ ⟨ fun i ↦ i * Real.sin (2*Real.pi*t) + (1-i) * Real.cos (2 * Real.pi * t), by {simp[EuclideanSpace.norm_eq, Finset.sum_range_succ, Finset.sum_fin_eq_sum_range]} ⟩
 
 
-lemma wrap_eq_iff (a b : I): wrap a = wrap b ↔ (a = 0 ∨ a = 1) ∧ (b = 0 ∨ b = 1) ∨ a = b := by{
+lemma Icc_distance' (a b : I) :  b.val - a.val ≤ 1 := by {
+  have := b.2
+  simp at this
+  have that := a.2
+  simp at that
+  simp
+  calc b.val ≤ 1 := this.2
+  _ ≤ 1 + 0 := by {ring; simp}
+  _ ≤ 1 + a.val := by {simp[that.1]}
+}
+
+
+lemma Icc_distance (a b : I) : (b.val - a.val ≤ 1 ) ∧ (b.val - a.val ≥ -1) := by {
   constructor
-  · intro h
-    have : (wrap a).val 1 = (wrap b).val 1 := by exact congrFun (congrArg Subtype.val h) 1
-    have h1 : Real.sin (2*Real.pi * a) = Real.sin (2*Real.pi * b) := by{
-      simp[wrap] at this
-      assumption
-    }
-    rw[Real.sin_eq_sin_iff] at h1
-    obtain ⟨k, hk⟩:= h1
+  · exact Icc_distance' a b
+  · have := Icc_distance' b a
+    simp
+    exact tsub_le_iff_left.mp this
+}
 
-    have : (wrap a).val 0 = (wrap b).val 0 := by exact congrFun (congrArg Subtype.val h) 0
-    have h2 : Real.cos (2*Real.pi * a) = Real.cos (2*Real.pi * b) := by{
-      simp[wrap] at this
-      assumption
-    }
-    --rw[Real.cos_eq_cos_iff] at h2
-    --obtain ⟨k', hk'⟩:= h2
+lemma Icc_distance_one' (a b : I) (h: b.val - a.val = 1) : b=1 := by{
+  have := b.2
+  have that := a.2
+  simp at this
+  simp at that
+  apply ge_antisymm
+  · calc 1 = b.val -a.val := h.symm
+    _ ≤ b := by simp[that.1]
+  · exact this.2
+}
 
-    obtain hc1|hc2 := hk
-    · ring at hc1
-      rw[mul_assoc, mul_assoc, mul_assoc,  ← mul_add Real.pi] at hc1
-      simp [Real.pi_ne_zero, mul_right_inj' ] at hc1
-      rw[← add_mul, mul_left_inj'] at hc1
-      have : k=0 ∨ k=1 ∨ k =-1 := by{
-        sorry
-      }
-      obtain hd1|hd2|hd3 := this
-      · rw[hd1] at hc1
-        simp at hc1
-        right
-        ext
-        simp[hc1]
-      · left
-        constructor
-        · sorry
-        · sorry
-      · left
-        constructor
-        · sorry
-        · sorry
-      · norm_num
-    · rw[hc2, Real.cos_sub] at h2
-      have hsin: Real.sin (2 * Real.pi * a) = 0 := by sorry
-      have hcos: Real.cos ((2*k + 1) * Real.pi) = -1 := by sorry
-      rw[hsin, hcos] at h2
-      simp[Real.cos_eq_zero_iff] at h2
-      obtain ⟨k', hk'⟩ := h2
-      have : k' = 0 ∨ k' = 1 := by {
-        sorry
-      }
-      obtain hd1|hd2 := this
-      · rw[hd1] at hk'
-        simp at hk'
-        sorry
+lemma Icc_distance_one (a b : I) (h: b.val - a.val = 1) : b=1 ∧ a = 0 := by{
+  constructor
+  · exact Icc_distance_one' a b h
+  · have := Icc_distance_one' a b h
+    rw[this] at h
+    norm_num at h
+    assumption
+}
+
+-- How is this not in mathlib? Was I just bad at searching?
+lemma Real.sin_cos_eq_iff {t s : ℝ} (hsin: Real.sin t = Real.sin s) (hcos: Real.cos t = Real.cos s) : ∃ k: ℤ, s = 2*k*Real.pi + t := by {
+  obtain ⟨k, hk⟩ :=  Real.cos_eq_cos_iff.mp hcos
+  obtain hc1|hc2 := hk
+  · use k
+  · have h1 : sin s = - sin s := by {
+    calc
+    sin s = sin (2*k*Real.pi - t) := congrArg Real.sin hc2
+    _ = - sin t := by {rw[←Real.sin_neg t, Real.sin_eq_sin_iff]; use -k; left; push_cast; ring}
+    _ = - sin s := by rw[hsin]
+  }
+    have h2s : sin s = 0 := by {simp at h1; assumption}
+    have h2t : sin t = 0 := by {rw[hsin]; assumption}
+    obtain ⟨i,hi⟩ := Real.sin_eq_zero_iff.mp h2s
+    obtain ⟨j,hj⟩ := Real.sin_eq_zero_iff.mp h2t
+    rw[←hi, ←hj] at hc2
+    have hc2' : j * Real.pi = 2*k*Real.pi - i*Real.pi := by simp[hc2]
+    use i-k
+    rw[← hi, ←hj, hc2']
+    have : 2 * ↑(i-k) * Real.pi = 2*i*Real.pi - 2*k*Real.pi := by {push_cast; ring}
+    rw[this]
+    ring
+}
 
 
 
-      rw[mul_assoc, mul_comm, mul_comm (2*(k:ℝ) +1) Real.pi, mul_assoc 2, mul_comm 2 (Real.pi * (a:ℝ) ), mul_assoc Real.pi a, ← mul_sub Real.pi, mul_assoc ] at hc2
-      simp [Real.pi_ne_zero, mul_left_inj'] at hc2
+lemma wrap_eq_iff_mp (a b : I) (h: wrap a = wrap b) : ((a=0 ∨ a=1) ∧ (b=0 ∨ b=1)) ∨ a=b := by{
+  have : (wrap a).val 1 = (wrap b).val 1 := by exact congrFun (congrArg Subtype.val h) 1
+  have h1 : Real.sin (2*Real.pi * a) = Real.sin (2*Real.pi * b) := by{
+    simp[wrap] at this
+    assumption
+  }
+
+  have : (wrap a).val 0 = (wrap b).val 0 := by exact congrFun (congrArg Subtype.val h) 0
+  have h2 : Real.cos (2*Real.pi * a) = Real.cos (2*Real.pi * b) := by{
+    simp[wrap] at this
+    assumption
+  }
+
+  obtain ⟨k, hk⟩ := Real.sin_cos_eq_iff h1 h2
+  rw[mul_assoc 2 (k:ℝ), mul_comm (k:ℝ), ←mul_assoc, ←mul_add (2*Real.pi)] at hk
+  simp [Real.pi_ne_zero, mul_right_inj' ] at hk
+  have hk' := eq_sub_of_add_eq (id hk.symm)
+  have hk1 : k ≤ 1 ∧ k ≥ -1 := by {
+    constructor
+    · apply (@Int.cast_le ℝ _ _ k 1).mp
+      rw[hk']
+      have : ((1:ℤ ) : ℝ ) = 1 := by norm_num
+      rw[this]
+      exact (Icc_distance a b).1
+    · apply (@Int.cast_le ℝ _ _ (-1) k).mp
+      have : ((-1:ℤ ) : ℝ ) = -1 := by norm_num
+      rw[hk', this]
+      exact (Icc_distance a b).2
+  }
+
+  have hk2 : k=0 ∨ k=1 ∨ k =-1 := by{
+    obtain ⟨hk1a, hk1b⟩ := hk1
+    interval_cases k <;> tauto
+  }
+
+  obtain hd1|hd2|hd3 := hk2
+  · right
+    rw[hd1] at hk
+    simp at hk
+    exact SetCoe.ext (id hk.symm)
+  · have hc1'': b.val -a.val = 1 := by simp[hk, hd2]
+    have := Icc_distance_one a b hc1''
+    tauto
+  · have hc1'' : a.val - b.val = 1 := by simp [hk, hd3]
+    have := Icc_distance_one b a hc1''
+    tauto
+}
 
 
+lemma wrap_eq_iff (a b : I): wrap a = wrap b ↔ ((a = 0 ∨ a = 1) ∧ (b = 0 ∨ b = 1)) ∨ a = b := by{
+  constructor
+  · exact fun a_1 ↦ wrap_eq_iff_mp a b a_1
   · intro h
     obtain hc1|hc2 := h
     · have: wrap 0 = wrap 1 := by simp[wrap]
@@ -1640,34 +1692,89 @@ lemma injective_wrap_quot : Injective wrap_quot := by{
   exact h'
 }
 
+
 lemma surjective_wrap_quot : Surjective wrap_quot := by {
   simp[wrap_quot]
   rw [Quot.surjective_lift]
   simp[wrap, Surjective]
   intro x hx
+  simp[EuclideanSpace.norm_eq, Finset.sum_fin_eq_sum_range, Finset.sum_range_succ] at hx
+  have hx': (x 1)^2 = 1 - (x 0)^2 := by simp [eq_sub_of_add_eq' hx]
+
+  have hx₁: (x 0)^2 ≤ 1 := by{
+    calc (x 0)^2 ≤ (x 0)^2 + (x 1)^2 := by apply le_add_of_nonneg_right; simp[sq_nonneg]
+    _ = 1 := by simp[hx]
+  }
+  simp at hx₁
+  have hx₂ := neg_le_of_abs_le hx₁
+  have hx₃ := le_of_abs_le hx₁
+
+  have hπ : Real.pi * (Real.pi)⁻¹ = 1 := mul_inv_cancel Real.pi_ne_zero
+
   by_cases h: x 1 ≥ 0
   · use (Real.arccos (x 0)) / (2*Real.pi)
     constructor
-    · sorry
+    · constructor
+      · rw[div_nonneg_iff]
+        left; constructor
+        · exact Real.arccos_nonneg _
+        · norm_num; apply le_of_lt Real.pi_pos
+      · rw[div_le_one (by norm_num; apply Real.pi_pos)]
+        calc Real.arccos (x 0) ≤ Real.pi := Real.arccos_le_pi (x 0)
+        _ = 1 * Real.pi := by rw[one_mul]
+        _ ≤ 2 * Real.pi := by gcongr; norm_num
+
     · rw[mul_comm]
       ring
-      rw[mul_assoc]
-      have: Real.pi * (Real.pi)⁻¹ = 1 := by sorry
-      rw[this]
+      rw[mul_assoc, hπ]
       ring
-      have h1 : -1 ≤ x 0 := by sorry
-      have h2 : x 0 ≤ 1  := by sorry
-      rw[Real.cos_arccos h1 h2]
+      rw[Real.cos_arccos hx₂ hx₃]
       rw[Real.sin_arccos]
 
-      have h3: x 1 = Real.sqrt (1 - (x 0)^2) := by sorry
-      sorry
+      have hx₄: x 1 = Real.sqrt (1 - (x 0)^2) := by {
+        have := congrArg Real.sqrt hx'
+        simp[h] at this
+        simp[this]
+      }
+      funext i
+      fin_cases i
+      · simp
+      · simp[hx₄]
+
 
   · use (2 * Real.pi - Real.arccos (x 0)) /(2*Real.pi)
+    simp at h
     constructor
-    · sorry
-    · sorry
+    · constructor
+      · apply div_nonneg
+        · simp
+          calc Real.arccos (x 0) ≤ Real.pi := Real.arccos_le_pi (x 0)
+          _ = 1 * Real.pi := (one_mul Real.pi).symm
+          _ ≤ 2 * Real.pi := by gcongr; norm_num
+        · norm_num; exact le_of_lt Real.pi_pos
+      · rw[div_le_one (by norm_num; apply Real.pi_pos)]
+        simp
+        exact Real.arccos_nonneg (x 0)
+    · ring
+      rw[mul_assoc, mul_comm (Real.arccos (x 0)), ←mul_assoc, pow_two, mul_assoc Real.pi Real.pi, hπ]
+      simp
+
+      have hx₄: x 1 = - Real.sqrt (1 - (x 0)^2) := by {
+        have := congrArg Real.sqrt hx'
+        simp[Real.sqrt_sq_eq_abs, abs_of_neg h] at this
+        have := congrArg Neg.neg this
+        simp at this
+        simp[this]
+      }
+
+      funext i
+      fin_cases i
+      · ring; simp
+        rw[mul_comm, Real.cos_add_two_pi, Real.cos_neg, Real.cos_arccos hx₂ hx₃]
+      · ring; simp[hx₄]
+        rw[mul_comm, Real.sin_add_two_pi, Real.sin_neg, Real.sin_arccos]
 }
+
 
 
 def wrap_quot_equiv: J ≃ circle := by{
@@ -1714,7 +1821,7 @@ def wrap_quot_pointed_homeo: J ≃ₜ⋆ circle where
 def smash_circle_J_pointed_homeo : X ⋀ (𝕊 1) ≃ₜ⋆ X ⋀ J := PointedHomeo.symm (homeo_wedge_compare' X (wrap_quot_pointed_homeo))
 
 
--- [Some proofs missing] Now I can show that X ⋀ J ≃ₜ⋆  Σ₀ X
+-- [one proof missing] Now I can show that X ⋀ J ≃ₜ⋆  Σ₀ X
 
 /-- The identity on X times the quotient map from the unit interval to the unit interval mod its extreme points-/
 def prod_I_quot: C(X × I, X × J) := ContinuousMap.prodMap (ContinuousMap.id X) (⟨Quotient.mk I_quotient, by apply continuous_quot_mk⟩)
@@ -1934,7 +2041,7 @@ instance : Inhabited C⋆(Y,Z) where
 
 namespace PointedMap
 variable {X Y Z}
-/- Much of the following (up to end PointedMap) is adapted from mathlib4/Mathlib/Topology/CompactOpen.lean by Reid Barton, starting on line 364 -/
+/- Much of the following (up to end PointedMap) is adapted from Mathlib.Topology.CompactOpen. The original file is by Reid Barton, starting on line 364 -/
 
 lemma continuous_function_curry' (f : C⋆(X ⋀ Y, Z)) : Continuous (f ∘ Quotient.mk (smashsetoid X Y)) := by {
   apply Continuous.comp
@@ -1995,8 +2102,6 @@ theorem curry_apply (f : C⋆(X ⋀ Y, Z)) (y : X) (z : Y) : f.curry y z = f (y 
 
 
 def toFun_toFun (f:C⋆(X, C⋆(Y, Z))) : X → (Y → Z) := fun y ↦ (fun z ↦ (f y) z)
-
--- I think much of this can happen at the level of pointed types with no mention of the topology. Should I do it there and extend?
 
 /-- The uncurrying of a pointed function X → (Y → Z)  to a function X ⋀ Y → Z. This is not the same as Function.uncurry, which maps to X × Y → Z -/
 def uncurry' (f:C⋆(X, C⋆(Y, Z))) : X ⋀ Y → Z := by {

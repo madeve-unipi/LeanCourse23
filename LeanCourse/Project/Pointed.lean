@@ -570,15 +570,11 @@ lemma hom_apply {X Y : PointedTopCat} (f : X ⟶ Y) (x : X) : f x = (ContinuousM
 
 
 -- I added this, I'm not sure it's needed and/or helpful
-@[simp] theorem coe_pointed_hom {X Y : Type u} [PointedTopSpace X] [PointedTopSpace Y] (f: C⋆(X,Y)) : X ⟶ Y := f
+@[simp] def coe_pointed_hom {X Y : Type u} [PointedTopSpace X] [PointedTopSpace Y] (f: C⋆(X,Y)) : X ⟶ Y := f
 
 
 
-@[simp] theorem coe_pointed_hom_apply {X Y : Type u} [PointedTopSpace X] [PointedTopSpace Y] (f: C⋆(X,Y)) (x:X) : coe_pointed_hom f x = f x := by{
-  --why not rfl??
-  -- rw[hom_apply (coe_pointed_hom f)] also does not work
-  sorry
-}
+@[simp] theorem coe_pointed_hom_apply {X Y : Type u} [PointedTopSpace X] [PointedTopSpace Y] (f: C⋆(X,Y)) (x:X) : coe_pointed_hom f x = f x := by rfl
 
 
 
@@ -588,7 +584,7 @@ lemma hom_apply {X Y : PointedTopCat} (f : X ⟶ Y) (x : X) : f x = (ContinuousM
 @[simp] theorem pointedmap_mk_coe' {X Y Z : PointedTopCat.{u}}  (f : X ⟶ Y) (g : Y ⟶ Z) : (coe_pointed_hom (PointedMap.mk (ContinuousMap.mk f.toFun f.continuous_toFun) f.pointed_toFun)) ≫ coe_pointed_hom (PointedMap.mk (ContinuousMap.mk g g.continuous_toFun) g.pointed_toFun)  = g ∘ f := by {
   -- note this relies on coe_pointed_hom_apply being in simp. At the moment, that one is broken
   funext x
-  simp[coe_pointed_hom]
+  simp
   rfl
 }
 
