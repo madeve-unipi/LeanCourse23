@@ -42,7 +42,7 @@ class PointedTopSpace (X:Type*)
   extends TopologicalSpace X where
   default : X
 
-instance (X:Type*) [TopologicalSpace X] [Inhabited X] : PointedTopSpace X where
+instance PointedTopOfTopOfInhabited (X:Type*) [TopologicalSpace X] [Inhabited X] : PointedTopSpace X where
   default := Inhabited.default
 
 instance (X:Type*) [PointedTopSpace X] : Inhabited X where
@@ -553,6 +553,13 @@ instance topologicalSpace_forget (X : PointedTopCat) : PointedTopSpace <| (forge
 @[simp]
 theorem coe_of (X : Type u) [PointedTopSpace X] : (of X : Type u) = X := rfl
 
+-- of forget
+@[simp]
+theorem of_forget (X: PointedTopCat) : of ((forget PointedTopCat).obj X) = X := rfl
+
+@[simp]
+theorem forget_of (X: Type u) [PointedTopSpace X] : (forget PointedTopCat).obj (of X) = X := rfl
+
 
 def Point : PointedTopCat where
   α := Fin 1
@@ -569,8 +576,11 @@ instance inhabited : Inhabited PointedTopCat := ⟨Point⟩
 lemma hom_apply {X Y : PointedTopCat} (f : X ⟶ Y) (x : X) : f x = (ContinuousMap.toFun ∘ PointedMap.toContinuousMap) f x := rfl
 
 
--- I added this, I'm not sure it's needed and/or helpful
+
 @[simp] def coe_pointed_hom {X Y : Type u} [PointedTopSpace X] [PointedTopSpace Y] (f: C⋆(X,Y)) : X ⟶ Y := f
+
+
+@[simp] def coe_pointed_hom' {X Y : Type u} [PointedTopSpace X] [PointedTopSpace Y] (f: C⋆(X,Y)) : of X ⟶ of Y := f
 
 
 
@@ -580,6 +590,12 @@ lemma hom_apply {X Y : PointedTopCat} (f : X ⟶ Y) (x : X) : f x = (ContinuousM
 
 @[ext] theorem ext (X Y : PointedTopCat) {f g: X ⟶ Y} (h : ∀ x, f x = g x) : f = g := FunLike.ext f g h
 
+@[ext] theorem ext' (X Y : PointedTopCat) {f g : X ⟶ Y} (h: f.toFun = g.toFun) : f = g := by {
+  apply FunLike.ext f g
+  intro x
+  have :=congrFun h x
+  exact this
+}
 
 @[simp] theorem pointedmap_mk_coe' {X Y Z : PointedTopCat.{u}}  (f : X ⟶ Y) (g : Y ⟶ Z) : (coe_pointed_hom (PointedMap.mk (ContinuousMap.mk f.toFun f.continuous_toFun) f.pointed_toFun)) ≫ coe_pointed_hom (PointedMap.mk (ContinuousMap.mk g g.continuous_toFun) g.pointed_toFun)  = g ∘ f := by {
   -- note this relies on coe_pointed_hom_apply being in simp. At the moment, that one is broken

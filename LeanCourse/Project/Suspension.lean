@@ -7,6 +7,7 @@ import Mathlib.CategoryTheory.Category.Pointed
 import Mathlib.Topology.CompactOpen
 import Mathlib.Topology.Maps
 import LeanCourse.Project.Pointed
+import LeanCourse.Project.Quotients
 open BigOperators Function Set Filter Topology TopologicalSpace CategoryTheory
 
 noncomputable section
@@ -65,92 +66,6 @@ variable {X': Type} [TopologicalSpace X']
 variable (f: X → X')
 
 
-/--The setoid on X associated to the quotient topological space X/A-/
-def quotient_setoid (A: Set X) : Setoid (X) where
-  r:= fun x ↦ fun y ↦ (x ∈ A ∧ y ∈ A) ∨ x=y
-  iseqv := {
-    refl:= by tauto
-    symm := by tauto
-    trans := by{
-      intro x y z hxy hyz
-      obtain hxy1|hxy2 := hxy
-      · obtain hyz1|hyz2 := hyz
-        · tauto
-        · rw[← hyz2]
-          tauto
-      · rw[hxy2]
-        assumption
-    }
-  }
-
-
-@[simp] theorem quotient_setoid_equiv_iff (A: Set X) (x y : X) : (quotient_setoid A).r x y ↔ ((x ∈ A ∧ y ∈ A) ∨ x = y ) := by {
-  exact Iff.rfl
-}
-
-@[simp] theorem quotient_setoid_equiv (A: Set X) (s: Setoid X) (h : s = quotient_setoid A) (x y : X) : x ≈ y ↔  ((x ∈ A ∧ y ∈ A) ∨ x = y ) := by {
-  have: s.r x y ↔ x ≈ y := by exact Iff.rfl
-  rw[← this]
-  simp[h]
-}
-
-/--define the setoid for taking a quotient in which to two disjoint subspaces A and B are collapsed to one point each-/
-def double_quotient_setoid {A B: Set X} (h: Disjoint A B) : Setoid (X) where
-  r:= fun x ↦ fun y ↦ (x ∈ A ∧ y ∈ A) ∨ (x ∈ B ∧ y ∈ B) ∨ x = y
-  iseqv := {
-    refl:= by tauto
-    symm := by tauto
-    trans := by{
-      intro x y z hxy hyz
-      obtain hxy1|hxy2|hxy3 := hxy
-      · obtain hyz1|hyz2|hyz3 := hyz
-        · tauto
-        · have : y ∈ A ∩ B := by {
-            constructor
-            · exact hxy1.2
-            · exact hyz2.1
-          }
-          rw[Set.disjoint_iff_inter_eq_empty] at h
-          rw[h] at this
-          contradiction
-        · rw[← hyz3]
-          tauto
-      · obtain hyz1|hyz2|hyz3 := hyz
-        · have : y ∈ A ∩ B := by {
-            constructor
-            · exact hyz1.1
-            · exact hxy2.2
-          }
-          rw[Set.disjoint_iff_inter_eq_empty] at h
-          rw[h] at this
-          contradiction
-        · tauto
-        · rw[← hyz3]
-          tauto
-      · rw[hxy3]
-        assumption
-    }
-  }
-
-
-lemma double_quotient_setoid_equiv_iff {A B: Set X} (h: Disjoint A B) (x y : X) : (double_quotient_setoid h).r x y ↔ ((x ∈ A ∧ y ∈ A) ∨ (x ∈ B ∧ y ∈ B) ∨ x = y) := Iff.rfl
-
--- we will need to define functions X/∼  → X/∼
-def quotient_double_lift {A B : Type*} (S: Setoid A) (T: Setoid B) (f: A → B) (h: ∀ a₁ a₂ : A, S.r a₁ a₂ → T.r (f a₁) (f a₂)) : Quotient S → Quotient T := by {
-  apply Quotient.lift (Quotient.mk T ∘ f)
-  intro a₁ a₂ h12
-  have : S.r a₁ a₂ := h12
-  specialize h a₁ a₂ h12
-  rw[Function.comp, Function.comp]
-  exact Quotient.eq.mpr h
-}
-
-lemma quotient_double_lift_commutes {A B : Type*} {S: Setoid A} {T: Setoid B} (f: A → B) {h: ∀ a₁ a₂ : A, S.r a₁ a₂ → T.r (f a₁) (f a₂)} : (Quotient.mk T) ∘ f = quotient_double_lift S T f h ∘ (Quotient.mk S) := by{
-  funext x
-  simp[quotient_double_lift]
-}
---ARE TOO MANY ARGUMENTS IMPLICIT?
---So far, I haven't used this. I should rephrase quotient-to-quotient maps in terms of this if it's worth it
 
 
 variable (X X')
@@ -314,6 +229,7 @@ instance : TopologicalSpace (BasedSuspension X) := instTopologicalSpaceQuotient
 instance : Inhabited (BasedSuspension X) where
   default:= Quotient.mk (basedsuspension_setoid X) ((default:X), 0)
 
+
 notation (priority:= high) "Σ₀" => BasedSuspension
 
 --[ TODO ] Define the based suspension functor and show it is a functor
@@ -401,8 +317,8 @@ variable (Z: Type) [PointedTopSpace Z]
 variable (g: Y →ₜ⋆  Z)
 
 variable {X Y Z} in
-lemma basedmapsuspension_comp : BasedMapSuspension (g.comp f) = (BasedMapSuspension g) ∘ (BasedMapSuspension f) := by{
-  funext x
+lemma basedmapsuspension_comp : BasedMapSuspension (g.comp f) = (BasedMapSuspension g).comp (BasedMapSuspension f) := by{
+  ext x
   simp
   obtain ⟨x₁, hx₁⟩ := Quot.exists_rep x
   rw[←hx₁]
@@ -421,6 +337,7 @@ lemma basedmapsuspension_comp' (f: X → Y) (g: Y → Z) (hf: Continuous f) (hg:
   rfl
 }
 
+lemma testing {A B C:Type} [PointedTopSpace A] [PointedTopSpace B] [PointedTopSpace C] (f: A ⟶ B) (g: B ⟶ C): f ≫ g = g.comp f := rfl
 
 def BasedSuspensionFunctor: Functor PointedTopCat PointedTopCat where
   obj:= fun X ↦ PointedTopCat.of (Σ₀ X)
@@ -432,32 +349,9 @@ def BasedSuspensionFunctor: Functor PointedTopCat PointedTopCat where
   }
   map_comp := by{
     dsimp
-    intro X Y Z f g
-    apply PointedTopCat.bundledHom.hom_ext
-    rw[BundledHom.toFun]
-
-    simp[BundledHom.toFun, BasedMapSuspension]
-    funext x
-
-
-    have : f ≫ g = g.comp f := rfl
-    rw[this]
-    -- what is going on here???
-    --rw[PointedTopCat.comp_app']
-    --rw[basedmapsuspension_comp' f g]
-
-
-    --simp[basedmapsuspension_comp']
-
-    --simp
-    sorry
+    intros
+    apply basedmapsuspension_comp
   }
-
-
-
-
-
-
 
 
 
@@ -612,7 +506,7 @@ def wedge_commutes: X ⋁ Y ≃ₜ Y ⋁ X where
 
 
 
---"The wedge product is the coproduct in pointed topological spaces"
+--Morally to be turned into "The wedge product is the coproduct in pointed topological spaces"
 variable {X Y} in
 def wedge_induced {Z: Type} [TopologicalSpace Z] [Inhabited Z] {f: X → Z} {g: Y → Z} (hf: f default = default) (hg: g default = default) : X ⋁ Y → Z := by {
   let _ := wedge_setoid X Y
@@ -702,19 +596,69 @@ lemma pointed_wedge_inr: wedge_inr X Y default = default := by{
 --Show that X ≃ₜ⋆ Z implies X ⋁ Y ≃ₜ⋆  Z ⋁ Y
 -- I proved this directly earlier but this is just functoriality of - ⋁ Y, and I need the functor later anyway
 
-/- To fix later-/
-def wedge_space : Functor PointedTopCat PointedTopCat where
+
+/- Define the functor - ⋁ Y -/
+
+variable{X Z} in
+def fun_wedge_id (f: C⋆(X, Z)) : C⋆(X ⋁ Y, Z ⋁ Y) where
+  toFun := by {
+    apply @wedge_induced X _ Y _ (Z ⋁ Y) _ _ ((wedge_inl Z Y) ∘ f) (wedge_inr Z Y)
+    · simp[pointed_wedge_inl]
+    · apply pointed_wedge_inr
+  }
+  continuous_toFun := by {
+    apply continuous_wedge_induced
+    · apply Continuous.comp
+      · apply continuous_wedge_inl
+      · exact f.continuous_toFun
+    · apply continuous_wedge_inr
+  }
+
+  pointed_toFun := by{
+    simp
+    apply pointed_wedge_induced
+  }
+
+lemma id_wedge_id: fun_wedge_id Y (@PointedMap.id X _) = PointedMap.id := by{
+  let _:= wedge_setoid X Y
+  simp[fun_wedge_id]
+  ext x
+  simp[wedge_induced, PointedMap.id]
+  obtain ⟨x', hx'⟩ := Quotient.exists_rep x
+  rw[← hx']
+  simp[Quotient.lift_mk]
+  induction x'
+  case inl y => rfl
+  case inr z => rfl
+}
+
+
+lemma fun_wedge_id_comp {W:Type} [PointedTopSpace W] (f:C⋆(X,Z)) (g: C⋆(Z,W)) : fun_wedge_id Y (g.comp f) = (fun_wedge_id Y g).comp (fun_wedge_id Y f) := by{
+  let _:= wedge_setoid X Y
+  ext p
+  obtain ⟨p', hp'⟩ := Quotient.exists_rep p
+  rw[← hp']
+  simp[fun_wedge_id, wedge_induced, Quotient.lift_mk]
+  induction p'
+  case inl y => rfl
+  case inr z => rfl
+}
+
+
+
+def wedge_whisker_right : Functor PointedTopCat PointedTopCat where
   obj:= fun A ↦ PointedTopCat.of (A ⋁ Y)
-  map := sorry
-  --map := fun (f: A ⟶ B) ↦ @wedge_induced A _ B _ (B ⋁ Y) _ _ ((wedge_inl Z B) ∘ f) (wedge_inr Z B) (by sorry) (by sorry)
+  map := fun_wedge_id Y
   map_id := by{
-    sorry
+    dsimp
+    intro X
+    apply id_wedge_id X Y
   }
   map_comp := by{
-    sorry
+    intros
+    simp
+    apply fun_wedge_id_comp
   }
-
-
 
 
 
@@ -1486,7 +1430,6 @@ notation "circle" => 𝕊 1
 def test2: EuclideanSpace ℝ (Fin 2) := fun n ↦ n
 #check Finset.sum_fin_eq_sum_range
 
-#check Real.cos_eq_cos_iff
 
 def wrap : I → circle := fun t ↦ ⟨ fun i ↦ i * Real.sin (2*Real.pi*t) + (1-i) * Real.cos (2 * Real.pi * t), by {simp[EuclideanSpace.norm_eq, Finset.sum_range_succ, Finset.sum_fin_eq_sum_range]} ⟩
 
@@ -1956,9 +1899,8 @@ lemma isOpen_sus_to_wedge : IsOpenMap (sus_to_wedge X) := by {
   }
 
   have hcomp : g ∘ f = i ∘ h := by{
-    -- I think this used to work before messing with type universes
-    simp[sus_to_wedge]
-    rw[Quotient.lift_comp_mk]
+    dsimp
+    rw[sus_to_wedge, Quotient.lift_comp_mk]
     rfl
   }
 
