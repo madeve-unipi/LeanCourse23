@@ -1,23 +1,12 @@
-import LeanCourse.Common
-import Mathlib.Topology.Instances.Real
-import Mathlib.AlgebraicTopology.FundamentalGroupoid.FundamentalGroup
-import Mathlib.Analysis.InnerProductSpace.PiL2
-import Mathlib.Analysis.SpecialFunctions.Trigonometric.Complex
+--import LeanCourse.Common
 import Mathlib.CategoryTheory.Category.Pointed
-import Mathlib.Topology.CompactOpen
-import Mathlib.Topology.Maps
-import LeanCourse.Project.Pointed
 import LeanCourse.Project.Quotients
 import Mathlib.CategoryTheory.Closed.Monoidal
 
 open BigOperators Function Set Filter Topology TopologicalSpace CategoryTheory
 
-/- Define the wedge and smash products of pointed sets and equip them with a topology
-in case the original sets are also topological spaces.
-
-[TODO]: Show that the wedge product is the coproduct in the category of pointed types and also
-of pointed topological spaces
-
+/- Define the wedge and smash products of pointed types and equip them with a topology
+in case the original types are also topological spaces.
 -/
 
 
@@ -29,13 +18,17 @@ namespace Pointed
 instance : Inhabited α  where
   default := α.point
 
-/--For pointed types α and β, the setoid of their disjoint union α ⊕ β identifying the basepoints of the two types. Used to construct the wedge product α ⋁ β.-/
+
+--I thought this would be in simp but never done in mathlib Pointed.lean
+lemma forget_morph (f: α ⟶ β) : (forget Pointed).map f = f.toFun := rfl
+
+/--For pointed types α and β, the setoid of their disjoint union α ⊕ β identifying the basepoints of the two types. Used to construct the wedge sum α ⋁ β.-/
 def wedge_setoid : Setoid (α ⊕ β) := by{
   let A: Set (α ⊕ β) := { p : α ⊕ β | p = Sum.inl (α.point) ∨ p = Sum.inr (β.point)}
   exact quotient_setoid A
 }
 
-/--The wedge product of two pointed types. That is, the quotient of the disjoint union identifying the two basepoints.-/
+/--The wedge sum of two pointed types. That is, the quotient of the disjoint union identifying the two basepoints.-/
 def wedge : Pointed where
   X := Quotient (wedge_setoid α β)
   point := Quotient.mk (wedge_setoid α β) (Sum.inl (α.point))
@@ -75,6 +68,7 @@ notation A "⋁⋆" b => wedge_inr A _ b
 variable {γ: Pointed.{u}}
 
 variable {α β} in
+/--The function induced on the wedge sum α ⋁ β by two pointed functions α → γ and β → γ. This is the underlying function in wedge_induced-/
 def wedge_induced_fun (f: Pointed.Hom α γ) (g: Pointed.Hom β γ) : (α ⋁ β) → γ := by{
   let _:= wedge_setoid α β
   apply Quotient.lift (Sum.elim f.toFun g.toFun)
@@ -108,11 +102,47 @@ lemma wedge_induced_pointed (f: Pointed.Hom α γ) (g: Pointed.Hom β γ) : wedg
 
 
 variable {α β} in
+/--The pointed function induced on the wedge sum α ⋁ β to γ by two pointed functions α → γ and β → γ.-/
 def wedge_induced (f: Pointed.Hom α γ) (g: Pointed.Hom β γ) : Pointed.Hom (α ⋁ β) γ where
   toFun := wedge_induced_fun f g
   map_point := wedge_induced_pointed f g
 
 
+/-The wedge sum is a coproduct-/
+open CategoryTheory.Limits
+
+def wedge_cofan : BinaryCofan α β := BinaryCofan.mk (wedge_inl α β) (wedge_inr α β)
+
+variable{α β} in
+def wedge_desc (s: BinaryCofan α β) : α ⋁ β ⟶ s.pt := wedge_induced s.inl s.inr
+
+instance wedge_iscolimit : IsColimit (wedge_cofan α β) := by{
+  apply BinaryCofan.isColimitMk wedge_desc
+  · intros; rfl
+  · intros; rfl
+  · intro s f hf₁ hf₂
+    ext x
+    obtain ⟨x', hx'⟩ := Quotient.exists_rep x
+    rw[← hx']
+    induction x'
+    case inl a => {
+      rw[Pointed.Hom.ext_iff] at hf₁
+      have := congrFun hf₁ a
+      exact this
+    }
+    case inr b => {
+      rw[Pointed.Hom.ext_iff] at hf₂
+      have := congrFun hf₂ b
+      exact this
+    }
+}
+
+
+-- I think the following maps are actually already defined for any binary coproduct in CategoryTheory.Limits.Shapes.BinaryProducts but I'll keep them here for now
+-- Actually, there are also theorems (co)prod.hom_ext allowing to check equality of morphisms (from) to (co)products on the morphisms that induce them.
+-- This might speed up some of the computations
+
+/--The pointed function α ⋁ β → β ⋁ α induced by including each summand into itself -/
 def wedge_swap := wedge_induced (wedge_inr β α) (wedge_inl β α)
 
 lemma wedge_swap_swap : (wedge_swap α β).comp (wedge_swap β α) = Pointed.Hom.id _ := by{
@@ -125,28 +155,58 @@ lemma wedge_swap_swap : (wedge_swap α β).comp (wedge_swap β α) = Pointed.Hom
   case inr z => rfl
 }
 
+/--The pointed equivalence α ⋁ β → β ⋁ α induced by swapping the two summands-/
 def wedge_swap_iso : α ⋁ β ≅ β ⋁ α where
   hom:= wedge_swap α β
   inv := wedge_swap β α
   hom_inv_id := wedge_swap_swap α β
   inv_hom_id := wedge_swap_swap β α
 
-/-[TODO] Show wedge product is coproduct-/
 
 protected def prod : Pointed where
   X:= α.X × β.X
   point := (α.point, β.point)
 
 
+
 infix:50 " ×⋆ " => Pointed.prod
+
 
 def prodFst : Pointed.Hom (α ×⋆ β) α where
   toFun := fun p ↦ p.1
   map_point := rfl
 
-def profSnd : Pointed.Hom (α ×⋆ β) β where
+def prodSnd : Pointed.Hom (α ×⋆ β) β where
   toFun := fun p ↦ p.2
   map_point := rfl
+
+-- This product is a categorical product
+variable {α β} in
+def prod_induced (f: Pointed.Hom γ α) (g: Pointed.Hom γ β) : Pointed.Hom γ (α ×⋆ β) where
+  toFun := fun c ↦ (f.toFun c, g.toFun c)
+  map_point:= by simp[f.map_point, g.map_point]; rfl
+
+def prod_fan : BinaryFan α β := BinaryFan.mk (prodFst α β) (prodSnd α β)
+
+variable{α β} in
+def prod_lift (s: BinaryFan α β) : s.pt ⟶ α ×⋆ β := prod_induced s.fst s.snd
+
+instance prod_isLimit : IsLimit (prod_fan α β) := by{
+  apply BinaryFan.isLimitMk prod_lift
+  · intros; rfl
+  · intros; rfl
+  · intro s f hf₁ hf₂
+    ext x
+    rw[Pointed.Hom.ext_iff] at hf₁
+    have h1 : (f.toFun x).1 = ((prod_lift s).toFun x).1 := congrFun hf₁ x
+    rw[Pointed.Hom.ext_iff] at hf₂
+    have h2 : (f.toFun x).2 = ((prod_lift s).toFun x).2 := congrFun hf₂ x
+    simp[FunLike.coe, forget_morph]
+    have : f.toFun x = ((f.toFun x).1, (f.toFun x).2) := rfl
+    rw[this]
+    have : (prod_lift s).toFun x = (((prod_lift s).toFun x).1, ((prod_lift s).toFun x).2) := rfl
+    rw[this, h1, h2]
+}
 
 
 def prod_inl : Pointed.Hom α (α ×⋆ β) where
@@ -169,9 +229,6 @@ theorem prod_swap_swap : (prod_swap α β).comp (prod_swap β α) = Pointed.Hom.
 def prod_swap_iso: (α ×⋆ β) ≅ (β ×⋆ α) where
   hom := prod_swap α β
   inv := prod_swap β α
-
-
---[TODO] prove the product is a categorical product
 
 
 
@@ -679,8 +736,6 @@ def smash_associator : (α ⋀ β) ⋀ γ ≅ α ⋀ (β ⋀ γ) where
 open MonoidalCategory
 
 
---I thought this would be in simp but never done in mathlib Pointed.lean
-lemma forget_morph (f: α ⟶ β) : (forget Pointed).map f = f.toFun := rfl
 
 instance : MonoidalCategory Pointed where
   tensorObj := smash
@@ -810,7 +865,7 @@ instance : MonoidalCategory Pointed where
   }
 
 
--- Show that this category is monoidal closed (aka hom-tensor adjunction)
+-- Show that this category is monoidal closed (aka hom-tensor adjunction, where tensor=smash)
 variable (α β γ)
 
 
@@ -855,7 +910,7 @@ instance hom_smash_core : Adjunction.CoreHomEquiv (tensorLeft α) (Hom.setLeft �
     rfl
   }
 
-
+/--The adjunction between the functor α ⋀ - and the internal hom functor Hom(α, -).-/
 def smash_hom_adjunction : (tensorLeft α) ⊣ (Hom.setLeft α) := CategoryTheory.Adjunction.mkOfHomEquiv (hom_smash_core α)
 
 instance smash_leftadjoint : IsLeftAdjoint (tensorLeft α) where
@@ -871,3 +926,5 @@ instance : MonoidalClosed Pointed where
 
 
 end Pointed
+
+#lint

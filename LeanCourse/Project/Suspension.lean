@@ -358,6 +358,7 @@ def BasedSuspensionFunctor: Functor PointedTopCat PointedTopCat where
 --[ TODO ] Define iterated suspensions
 
 -- define the wedge product X ⋁ Y of two pointed spaces X and Y
+
 instance: TopologicalSpace (X ⊕ Y) := by infer_instance
 
 def wedge_setoid : Setoid (X ⊕ Y) := by{
@@ -372,6 +373,7 @@ instance: Inhabited (Wedge X Y) where
   default:= Quotient.mk (wedge_setoid X Y) (Sum.inl (default:X))
 
 infix:50 " ⋁ " => Wedge
+
 
 -- easy lemma for later
 lemma wedge_defaults_equiv: Quotient.mk (wedge_setoid X Y) (Sum.inl default) = Quotient.mk (wedge_setoid X Y) (Sum.inr default) := by{
@@ -477,7 +479,7 @@ def wedge_commutes: X ⋁ Y ≃ₜ Y ⋁ X where
   left_inv:= by {
     let _hwedge := wedge_setoid X Y
     let _hwedge' := wedge_setoid Y X
-    simp[LeftInverse]
+    simp[Function.LeftInverse]
     intro p
     obtain ⟨p', hp'⟩ := Quotient.exists_rep p
     rw[← hp']
@@ -491,7 +493,7 @@ def wedge_commutes: X ⋁ Y ≃ₜ Y ⋁ X where
     }
   }
   right_inv:= by {
-    simp[Function.RightInverse, LeftInverse]
+    simp[Function.RightInverse, Function.LeftInverse]
     intro p
     obtain ⟨p', hp'⟩ := Quotient.exists_rep p
     rw[← hp']
@@ -1049,7 +1051,8 @@ Ideally, this construction should simply be part of the category of pointed type
 So there should be something like Pointed.smash that takes two pointed types (as in Mathlib/CategoryTheory/Category/Pointed)
 and gives back their smash products.
 This way, I can define the currying and uncurrying functions at the level of pointed sets
-then do what I want to do for (locally compact when needed) topological spaces
+then do what I want to do for (locally compact when needed) topological spaces.
+Ideally, show the category of pointed type has a monoidal structure where smashing is the tensor product
 -/
 
 instance: TopologicalSpace (Smash X Y) := by exact instTopologicalSpaceQuotient
@@ -1059,7 +1062,7 @@ instance: Inhabited (Smash X Y) where
 infix:50 " ⋀  " => Smash
 
 variable {X Y} in
-def smash_elt (y:X) (z:Y) : X ⋀ Y := Quotient.mk (smashsetoid X Y) (y,z)
+def smash_elt (x:X) (y:Y) : X ⋀ Y := Quotient.mk (smashsetoid X Y) (x,y)
 
 infix:50 " ∧' " => smash_elt
 
@@ -1399,6 +1402,11 @@ def homeo_wedge_compare : X ⋀ Y ≃ₜ⋆ Z ⋀ Y where
 variable{X Z} in
 /--The pointed homeomorphism from Y ⋀ X to Y ⋀ Z obtained via a pointed homeomorphism from X to Z-/
 def homeo_wedge_compare': Y ⋀ X ≃ₜ⋆ Y ⋀ Z := PointedHomeo.trans (PointedHomeo.trans (homeo_smash_swap Y X) (homeo_wedge_compare Y k)) (homeo_smash_swap Z Y)
+
+
+
+
+
 
 --define the spheres Sⁿ
 
@@ -2039,7 +2047,7 @@ def curry (f : C⋆(X ⋀ Y, Z)) : C⋆(X, C⋆(Y, Z)) where
   pointed_toFun:= pointed_curry' f
 
 @[simp]
-theorem curry_apply (f : C⋆(X ⋀ Y, Z)) (y : X) (z : Y) : f.curry y z = f (y ∧'z) :=
+theorem curry_apply (f : C⋆(X ⋀ Y, Z)) (x : X) (y : Y) : f.curry x y = f (x ∧'y) :=
   rfl
 
 
@@ -2180,9 +2188,15 @@ def equiv_curry: C⋆(X ⋀ Y, Z) ≃ C⋆(X, C⋆(Y, Z)) := by{
 
 -- [ TODO ] Naturality
 
+
+theorem pointed_equiv_curry: @equiv_curry X _ _ Y _ Z _ _ _ default = default := rfl
+
+
+
+
 /- For Y = J the quotient of the unit interval by its extremes, we get a natural equivalence
   C⋆(X ⋀ J, Z) ≃ C⋆ (X, C⋆(J, Z))
-  I haven't study in detail how GenLoop is defined in Mathlib.Topology.Homotopy.HomotopyGroup
+  I haven't studied in detail how GenLoop is defined in Mathlib.Topology.Homotopy.HomotopyGroup
   but C⋆(J, Y) should be GenLoop 1 Y (= ΩY)
   We have proven X ⋀ J ≃ₜ⋆ Σ₀ X is the pointed suspension
   One should prove that C⋆(A, -) and C⋆(-, B) are functors (these are the hom functors, so it's probably already in the library somewhere)
