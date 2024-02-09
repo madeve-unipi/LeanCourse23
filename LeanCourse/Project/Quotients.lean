@@ -1,6 +1,5 @@
 import LeanCourse.Common
 import Mathlib.Topology.Instances.Real
-import LeanCourse.Project.Pointed
 
 /-
 This file defines the setoid associated to collapsing a subset into a point and provides some basic lemmas.
@@ -80,7 +79,10 @@ def double_quotient_setoid {A B: Set X} (h: Disjoint A B) : Setoid (X) where
 
 lemma double_quotient_setoid_equiv_iff {A B: Set X} (h: Disjoint A B) (x y : X) : (double_quotient_setoid h).r x y ↔ ((x ∈ A ∧ y ∈ A) ∨ (x ∈ B ∧ y ∈ B) ∨ x = y) := Iff.rfl
 
--- we will need to define functions X/∼  → Y/∼
+
+-- I don't think I have ever used the following in the actual project, it does not save that much time anyway:
+
+-- This defines a function X/∼  → Y/∼
 def quotient_double_lift {A B : Type*} (S: Setoid A) (T: Setoid B) (f: A → B) (h: ∀ a₁ a₂ : A, S.r a₁ a₂ → T.r (f a₁) (f a₂)) : Quotient S → Quotient T := by {
   apply Quotient.lift (Quotient.mk T ∘ f)
   intro a₁ a₂ h12
@@ -94,4 +96,3 @@ lemma quotient_double_lift_commutes {A B : Type*} {S: Setoid A} {T: Setoid B} (f
   funext x
   simp[quotient_double_lift]
 }
---So far, I haven't used this lift. I should rephrase quotient-to-quotient maps in terms of this if it's worth it

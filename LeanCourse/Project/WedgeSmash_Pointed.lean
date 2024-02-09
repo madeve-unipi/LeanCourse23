@@ -5,8 +5,12 @@ import Mathlib.CategoryTheory.Closed.Monoidal
 
 open BigOperators Function Set Filter Topology TopologicalSpace CategoryTheory
 
-/- Define the wedge and smash products of pointed types and equip them with a topology
-in case the original types are also topological spaces.
+/- This file defines the wedge sum and smash product in the category of pointed types.
+It shows that the cartesian product is the categorical product, the wedge sum is the coproduct,
+and the wedge product is the tensor product, giving Pointed the structure of a closed monoidal category.
+
+(This is not strictly related to the rest of the project, but it is currently still listed as "To do"
+in Mathlib.CategoryTheory.Category.Pointed and I had done most of the work towards it for pointed topological spaces)
 -/
 
 
@@ -140,7 +144,7 @@ instance wedge_iscolimit : IsColimit (wedge_cofan α β) := by{
 
 -- I think the following maps are actually already defined for any binary coproduct in CategoryTheory.Limits.Shapes.BinaryProducts but I'll keep them here for now
 -- Actually, there are also theorems (co)prod.hom_ext allowing to check equality of morphisms (from) to (co)products on the morphisms that induce them.
--- This might speed up some of the computations
+-- This might speed up some of the things below
 
 /--The pointed function α ⋁ β → β ⋁ α induced by including each summand into itself -/
 def wedge_swap := wedge_induced (wedge_inr β α) (wedge_inl β α)
@@ -379,7 +383,7 @@ protected def two : Pointed.{u} where
   point := ⟨0, by norm_num⟩
 
 
---So this should be okay, apparently
+
 instance fin_lift : Fintype (ULift (Fin 2)) := by infer_instance
 
 protected def two_1 : Pointed.two := ⟨1, by norm_num⟩
@@ -573,6 +577,8 @@ variable {α β γ}
 
 def coe (f: Pointed.Hom.set α (Pointed.Hom.set β γ)) : α → (β → γ) := fun a ↦ (f.toFun a).toFun
 
+
+-- This part (definitions and properties of currying and uncurrying) is adapted from Mathlib.Topology.CompactOpen
 
 def curry' (f: Pointed.Hom (α ⋀ β) γ) : α → (Pointed.Hom β γ) := fun a ↦ ⟨fun b ↦ f.toFun (a ∧' b), by simp[f.map_point]⟩
 
@@ -892,7 +898,7 @@ def smash_symm_hom_equiv : Pointed.Hom (α ⋀ β) γ ≃ Pointed.Hom (β ⋀ α
   }
 
 
-instance hom_smash_core : Adjunction.CoreHomEquiv (tensorLeft α) (Hom.setLeft α) where
+def hom_smash_core : Adjunction.CoreHomEquiv (tensorLeft α) (Hom.setLeft α) where
   homEquiv (β γ : Pointed) := (smash_symm_hom_equiv α β γ).trans Hom.curry_equiv
   homEquiv_naturality_left_symm := by{
     intros
@@ -927,4 +933,4 @@ instance : MonoidalClosed Pointed where
 
 end Pointed
 
-#lint
+--#lint

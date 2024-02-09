@@ -21,21 +21,10 @@ Further references are:
   https://leanprover-community.github.io/mathlib4_docs/Mathlib/Data/FunLike/Basic.html
   https://leanprover-community.github.io/mathlib4_docs/Mathlib/Data/FunLike/Equiv.html
 
-
-# Pointed Homeomorphisms
-This file defines pointed homeomorphisms between pointed topological spaces.
-They are homeomorphisms whose underlying functions are pointed, that is, they are isomorphisms of pointed topological spaces.
-We denote pointed homeomorphisms with the notation ` ≃ₜ⋆ `
-
-# Main definitions
-... to be filled later
-
-# Main results
-... to be filled later
-
 -/
 
-/- Extending mathlib4/Mathlib/Topology/ContinuousFunction/Basic.lean -/
+
+/- This part extends mathlib4/Mathlib/Topology/ContinuousFunction/Basic.lean -/
 
 
 class PointedTopSpace (X:Type*)
@@ -48,6 +37,8 @@ instance PointedTopOfTopOfInhabited (X:Type*) [TopologicalSpace X] [Inhabited X]
 instance (X:Type*) [PointedTopSpace X] : Inhabited X where
   default := PointedTopSpace.default
 
+theorem defaults_eq {X:Type*} [PointedTopSpace X] : @Inhabited.default X _  = @PointedTopSpace.default X _ := rfl
+
 variable (X:Type*) (Y:Type*) (Z:Type*) [PointedTopSpace X] [PointedTopSpace Y] [PointedTopSpace Z]
 
 
@@ -57,9 +48,17 @@ structure PointedMap (X:Type*) (Y:Type*) [PointedTopSpace X] [PointedTopSpace Y]
   /-The underlying function maps the base point of the domain to the base point of the target-/
   pointed_toFun : toFun default = default := by simp
 
+/- I don't have time to fix this, but there's a slight issue here:
+  when I say default, it's interpreted as Inhabited.default
+  which is why I put defaults_eq there
+  If I force it to be PointedTopSpace.default, something else breaks below
+  and I don't have time to fix it.
+  If I don't (and I haven't), I have to use defaults_eq a bunch of times while defining wedge/smash products
+  This should be fixed at some point.
+-/
 
 
-/-ISSUE HERE:
+/-NOTE:
 
 -- toFun is protected in ContinuousMap, which I think is the reason why PointedMap.toFun does not work
 #check PointedMap.pointed_toFun
@@ -127,7 +126,7 @@ protected def copy (f : PointedMap X Y) (f' : X → Y) (h : f' = ⇑f) : Pointed
 @[simp] theorem pointedmap_mk_coe (f : C(X,Y) ) (b) : (PointedMap.mk f b: X → Y) = f :=
   rfl
 
--- this should be what we wanted in the first place
+
 @[simp] theorem pointedmap_mk_coe' (a : X → Y) (b c) : (PointedMap.mk (ContinuousMap.mk a b) c: X → Y) = a :=
   rfl
 
@@ -252,11 +251,6 @@ I don't think I strictly need this
   rfl
 
 
-/- Here, there is no empty pointed homeomorphism (inhabited types are nonempty)
-  Though there should be some notion of trivial pointed homeo between two points
-  I don't know if there's a standard way to encode hX and hY below, like some typeclass
--/
-
 /--The trivial pointed isomorphism between two pointed spaces made of a single point-/
 protected def trivial [Unique X] [Unique Y]: X ≃ₜ⋆ Y where
   toFun := fun _ ↦ default
@@ -305,7 +299,7 @@ theorem coe_symm_toEquiv (h : X ≃ₜ⋆ Y) : ⇑h.toEquiv.symm = h.symm :=
   rfl
 
 
-/-- Identity map as a pointed homeomorphism. -/
+/-- The identity map as a pointed homeomorphism. -/
 @[simps! (config := .asFn) apply]
 protected def refl (X : Type*) [TopologicalSpace X] [Inhabited X]: X ≃ₜ⋆ X where
   continuous_toFun := continuous_id
@@ -487,7 +481,6 @@ variable (Y:Type*) [PointedTopSpace Y]
 @[to_additive existing PointedTopCat]
 def PointedTopCat: Type (u+1) := Bundled PointedTopSpace
 
-#check (@PointedMap.toContinuousMap X Y _ _ _).toFun
 
 namespace PointedTopCat
 
@@ -657,10 +650,6 @@ Final comments:
 - [TODO] Do I need more simp lemmas for PointedMap?
 - [TODO] Rephrase the embedding Y ⋁ Z → Y × Z in Suspension.lean in terms of the Embeddings section here
 
-
-- Should this file be made compatible with
-https://github.com/leanprover-community/mathlib4/blob/8666bd82efec40b8b3a5abca02dc9b24bbdf2652/Mathlib/CategoryTheory/Category/Pointed.lean#L29-L33
-???
 -/
 
 --#lint
