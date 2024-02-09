@@ -14,7 +14,7 @@ open BigOperators Function Set Filter Topology TopologicalSpace CategoryTheory
 variable (X: Type) [PointedTopSpace X] (Y:Type) [PointedTopSpace Y]
 
 /- This file defines the wedge sum and the smash product of two pointed topological spaces.
-  It proves some basic properties, including the adjunction between the functor - ⋀ Y and C⋆(-, Y)
+  It proves some basic properties, including the adjunction between the functor - ⋀ Y and C⋆(Y, -)
   for Y locally compact.
   A previous version of this file with clumsier proofs can be found in the repository history as part of
   the file Suspension.lean.
